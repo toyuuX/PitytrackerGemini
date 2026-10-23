@@ -1,0 +1,1939 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Genshin Track - Wish Tracker & Companion</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Nunito:wght@400;600;700;800;900&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & ReactDOM CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel CDN for inline JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            gt: {
+              bg: 'var(--bg-main, #0A0F23)',
+              sec: 'var(--bg-sec, #0E1530)',
+              card: 'var(--bg-card, #131B3B)',
+              raised: 'var(--bg-raised, #1A2448)',
+              border: 'var(--border-color, #2B3766)',
+              gold: 'var(--accent-gold, #F0C36A)',
+              warmGold: 'var(--accent-warm, #FFB259)',
+              text: 'var(--text-main, #E9EDFF)',
+              subtext: 'var(--text-sub, #AEB7DC)',
+              r5: '#F3B942',
+              r4: '#A974F2',
+              r3: '#5AA0F2',
+              pyro: '#FF6640',
+              hydro: '#33CCFF',
+              anemo: '#00FF99',
+              electro: '#CC80FF',
+              dendro: '#A6E92D',
+              cryo: '#99FFFF',
+              geo: '#FFB300'
+            }
+          },
+          fontFamily: {
+            roboto: ['Roboto', 'sans-serif'],
+            nunito: ['Nunito', 'sans-serif'],
+            marcellus: ['Marcellus', 'serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      --bg-main: #0A0F23;
+      --bg-sec: #0E1530;
+      --bg-card: #131B3B;
+      --bg-raised: #1A2448;
+      --border-color: #2B3766;
+      --accent-gold: #F0C36A;
+      --accent-warm: #FFB259;
+      --text-main: #E9EDFF;
+      --text-sub: #AEB7DC;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: 'Roboto', sans-serif;
+      overflow-x: hidden;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+    }
+
+    .font-heading { font-family: 'Nunito', sans-serif; }
+    .font-genshin { font-family: 'Marcellus', serif; }
+
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0A0F23; }
+    ::-webkit-scrollbar-thumb { background: #2B3766; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #F0C36A; }
+
+    /* Animations */
+    .animate-fadeIn { animation: fadeIn 0.2s ease-out forwards; }
+    .animate-slideUp { animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .animate-bounceSlow { animation: bounce 3s infinite; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Glow effects */
+    .glow-gold { box-shadow: 0 0 15px rgba(240, 195, 106, 0.25); }
+    .text-gradient-gold {
+      background: linear-gradient(135deg, #FFF0CA 0%, #F0C36A 50%, #FFB259 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    input[type=range] {
+      accent-color: var(--accent-gold);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Main Application Logic -->
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+    // --- MATERIAL & ITEM ICON DATABASE ---
+    const MATERIAL_ICONS = {
+      primogem: 'https://enka.network/ui/UI_ItemIcon_201.png',
+      intertwined: 'https://enka.network/ui/UI_ItemIcon_223.png',
+      acquaint: 'https://enka.network/ui/UI_ItemIcon_224.png',
+      fragileResin: 'https://enka.network/ui/UI_ItemIcon_210.png',
+      condensedResin: 'https://enka.network/ui/UI_ItemIcon_220007.png',
+      originalResin: 'https://enka.network/ui/UI_ItemIcon_210.png',
+      mora: 'https://enka.network/ui/UI_ItemIcon_202.png',
+      crown: 'https://enka.network/ui/UI_ItemIcon_104319.png',
+      heroWit: 'https://enka.network/ui/UI_ItemIcon_104003.png',
+      starglitter: 'https://enka.network/ui/UI_ItemIcon_221.png',
+      stardust: 'https://enka.network/ui/UI_ItemIcon_222.png'
+    };
+
+    // --- COMPREHENSIVE CHARACTER DATABASE ---
+    const CHARACTER_DATABASE = [
+      // 5-Star Characters
+      { id: 'skirk', name: 'Skirk', rarity: 5, element: 'cryo', weapon: 'Sword', region: 'Khaenri\'ah', icon: 'https://enka.network/ui/UI_AvatarIcon_Skirk.png' },
+      { id: 'escoffier', name: 'Escoffier', rarity: 5, element: 'cryo', weapon: 'Polearm', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Escoffier.png' },
+      { id: 'mavuika', name: 'Mavuika', rarity: 5, element: 'pyro', weapon: 'Claymore', region: 'Natlan', icon: 'https://enka.network/ui/UI_AvatarIcon_Mavuika.png' },
+      { id: 'xilonen', name: 'Xilonen', rarity: 5, element: 'geo', weapon: 'Sword', region: 'Natlan', icon: 'https://enka.network/ui/UI_AvatarIcon_Xilonen.png' },
+      { id: 'chasca', name: 'Chasca', rarity: 5, element: 'anemo', weapon: 'Bow', region: 'Natlan', icon: 'https://enka.network/ui/UI_AvatarIcon_Chasca.png' },
+      { id: 'citlali', name: 'Citlali', rarity: 5, element: 'cryo', weapon: 'Catalyst', region: 'Natlan', icon: 'https://enka.network/ui/UI_AvatarIcon_Citlali.png' },
+      { id: 'kinich', name: 'Kinich', rarity: 5, element: 'dendro', weapon: 'Claymore', region: 'Natlan', icon: 'https://enka.network/ui/UI_AvatarIcon_Kinich.png' },
+      { id: 'mualani', name: 'Mualani', rarity: 5, element: 'hydro', weapon: 'Catalyst', region: 'Natlan', icon: 'https://enka.network/ui/UI_AvatarIcon_Mualani.png' },
+      { id: 'neuvillette', name: 'Neuvillette', rarity: 5, element: 'hydro', weapon: 'Catalyst', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Neuvillette.png' },
+      { id: 'furina', name: 'Furina', rarity: 5, element: 'hydro', weapon: 'Sword', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Furina.png' },
+      { id: 'arlecchino', name: 'Arlecchino', rarity: 5, element: 'pyro', weapon: 'Polearm', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Arlecchino.png' },
+      { id: 'navia', name: 'Navia', rarity: 5, element: 'geo', weapon: 'Claymore', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Navia.png' },
+      { id: 'clorinde', name: 'Clorinde', rarity: 5, element: 'electro', weapon: 'Sword', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Clorinde.png' },
+      { id: 'wriothesley', name: 'Wriothesley', rarity: 5, element: 'cryo', weapon: 'Catalyst', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Wriothesley.png' },
+      { id: 'lyney', name: 'Lyney', rarity: 5, element: 'pyro', weapon: 'Bow', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Lyney.png' },
+      { id: 'sigewinne', name: 'Sigewinne', rarity: 5, element: 'hydro', weapon: 'Bow', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Sigewinne.png' },
+      { id: 'emilie', name: 'Emilie', rarity: 5, element: 'dendro', weapon: 'Polearm', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Emilie.png' },
+      { id: 'chiori', name: 'Chiori', rarity: 5, element: 'geo', weapon: 'Sword', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Chiori.png' },
+      { id: 'xianyun', name: 'Xianyun', rarity: 5, element: 'anemo', weapon: 'Catalyst', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Xianyun.png' },
+      { id: 'nahida', name: 'Nahida', rarity: 5, element: 'dendro', weapon: 'Catalyst', region: 'Sumeru', icon: 'https://enka.network/ui/UI_AvatarIcon_Nahida.png' },
+      { id: 'alhaitham', name: 'Alhaitham', rarity: 5, element: 'dendro', weapon: 'Sword', region: 'Sumeru', icon: 'https://enka.network/ui/UI_AvatarIcon_Alhatham.png' },
+      { id: 'cyno', name: 'Cyno', rarity: 5, element: 'electro', weapon: 'Polearm', region: 'Sumeru', icon: 'https://enka.network/ui/UI_AvatarIcon_Cyno.png' },
+      { id: 'wanderer', name: 'Wanderer', rarity: 5, element: 'anemo', weapon: 'Catalyst', region: 'Sumeru', icon: 'https://enka.network/ui/UI_AvatarIcon_Wanderer.png' },
+      { id: 'nilou', name: 'Nilou', rarity: 5, element: 'hydro', weapon: 'Sword', region: 'Sumeru', icon: 'https://enka.network/ui/UI_AvatarIcon_Nilou.png' },
+      { id: 'tighnari', name: 'Tighnari', rarity: 5, element: 'dendro', weapon: 'Bow', region: 'Sumeru', icon: 'https://enka.network/ui/UI_AvatarIcon_Tighnari.png' },
+      { id: 'dehya', name: 'Dehya', rarity: 5, element: 'pyro', weapon: 'Claymore', region: 'Sumeru', icon: 'https://enka.network/ui/UI_AvatarIcon_Dehya.png' },
+      { id: 'raiden', name: 'Raiden Shogun', rarity: 5, element: 'electro', weapon: 'Polearm', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Shohou.png' },
+      { id: 'kazuha', name: 'Kaedehara Kazuha', rarity: 5, element: 'anemo', weapon: 'Sword', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Kazuha.png' },
+      { id: 'ayaka', name: 'Kamisato Ayaka', rarity: 5, element: 'cryo', weapon: 'Sword', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Ayaka.png' },
+      { id: 'ayato', name: 'Kamisato Ayato', rarity: 5, element: 'hydro', weapon: 'Sword', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Ayato.png' },
+      { id: 'yae_miko', name: 'Yae Miko', rarity: 5, element: 'electro', weapon: 'Catalyst', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Yae.png' },
+      { id: 'yoimiya', name: 'Yoimiya', rarity: 5, element: 'pyro', weapon: 'Bow', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Yoimiya.png' },
+      { id: 'kokomi', name: 'Sangonomiya Kokomi', rarity: 5, element: 'hydro', weapon: 'Catalyst', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Kokomi.png' },
+      { id: 'itto', name: 'Arataki Itto', rarity: 5, element: 'geo', weapon: 'Claymore', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Itto.png' },
+      { id: 'zhongli', name: 'Zhongli', rarity: 5, element: 'geo', weapon: 'Polearm', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Zhongli.png' },
+      { id: 'hu_tao', name: 'Hu Tao', rarity: 5, element: 'pyro', weapon: 'Polearm', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Hutao.png' },
+      { id: 'yelan', name: 'Yelan', rarity: 5, element: 'hydro', weapon: 'Bow', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Yelan.png' },
+      { id: 'ganyu', name: 'Ganyu', rarity: 5, element: 'cryo', weapon: 'Bow', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Ganyu.png' },
+      { id: 'xiao', name: 'Xiao', rarity: 5, element: 'anemo', weapon: 'Polearm', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Xiao.png' },
+      { id: 'shenhe', name: 'Shenhe', rarity: 5, element: 'cryo', weapon: 'Polearm', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Shenhe.png' },
+      { id: 'baizhu', name: 'Baizhu', rarity: 5, element: 'dendro', weapon: 'Catalyst', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Baizhuer.png' },
+      { id: 'keqing', name: 'Keqing', rarity: 5, element: 'electro', weapon: 'Sword', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Keqing.png' },
+      { id: 'qiqi', name: 'Qiqi', rarity: 5, element: 'cryo', weapon: 'Sword', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Qiqi.png' },
+      { id: 'venti', name: 'Venti', rarity: 5, element: 'anemo', weapon: 'Bow', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Venti.png' },
+      { id: 'jean', name: 'Jean', rarity: 5, element: 'anemo', weapon: 'Sword', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Quin.png' },
+      { id: 'diluc', name: 'Diluc', rarity: 5, element: 'pyro', weapon: 'Claymore', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Diluc.png' },
+      { id: 'mona', name: 'Mona', rarity: 5, element: 'hydro', weapon: 'Catalyst', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Mona.png' },
+      { id: 'klee', name: 'Klee', rarity: 5, element: 'pyro', weapon: 'Catalyst', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Klee.png' },
+      { id: 'eula', name: 'Eula', rarity: 5, element: 'cryo', weapon: 'Claymore', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Eula.png' },
+      { id: 'albedo', name: 'Albedo', rarity: 5, element: 'geo', weapon: 'Sword', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Albedo.png' },
+      { id: 'tartaglia', name: 'Tartaglia (Childe)', rarity: 5, element: 'hydro', weapon: 'Bow', region: 'Snezhnaya', icon: 'https://enka.network/ui/UI_AvatarIcon_Tartaglia.png' },
+      { id: 'aloy', name: 'Aloy', rarity: 5, element: 'cryo', weapon: 'Bow', region: 'Outlander', icon: 'https://enka.network/ui/UI_AvatarIcon_Aloy.png' },
+      { id: 'traveler', name: 'Traveler', rarity: 5, element: 'anemo', weapon: 'Sword', region: 'Outlander', icon: 'https://enka.network/ui/UI_AvatarIcon_PlayerBoy.png' },
+
+      // 4-Star Characters
+      { id: 'kachina', name: 'Kachina', rarity: 4, element: 'geo', weapon: 'Polearm', region: 'Natlan', icon: 'https://enka.network/ui/UI_AvatarIcon_Kachina.png' },
+      { id: 'ororon', name: 'Ororon', rarity: 4, element: 'electro', weapon: 'Bow', region: 'Natlan', icon: 'https://enka.network/ui/UI_AvatarIcon_Ororon.png' },
+      { id: 'iansan', name: 'Iansan', rarity: 4, element: 'electro', weapon: 'Polearm', region: 'Natlan', icon: 'https://enka.network/ui/UI_AvatarIcon_Iansan.png' },
+      { id: 'gaming', name: 'Gaming', rarity: 4, element: 'pyro', weapon: 'Claymore', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Gaming.png' },
+      { id: 'chevreuse', name: 'Chevreuse', rarity: 4, element: 'pyro', weapon: 'Polearm', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Chevreuse.png' },
+      { id: 'charlotte', name: 'Charlotte', rarity: 4, element: 'cryo', weapon: 'Catalyst', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Charlotte.png' },
+      { id: 'freminet', name: 'Freminet', rarity: 4, element: 'cryo', weapon: 'Claymore', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Freminet.png' },
+      { id: 'lynette', name: 'Lynette', rarity: 4, element: 'anemo', weapon: 'Sword', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Lynette.png' },
+      { id: 'sethos', name: 'Sethos', rarity: 4, element: 'electro', weapon: 'Bow', region: 'Sumeru', icon: 'https://enka.network/ui/UI_AvatarIcon_Sethos.png' },
+      { id: 'kaveh', name: 'Kaveh', rarity: 4, element: 'dendro', weapon: 'Claymore', region: 'Sumeru', icon: 'https://enka.network/ui/UI_AvatarIcon_Kaveh.png' },
+      { id: 'faruzan', name: 'Faruzan', rarity: 4, element: 'anemo', weapon: 'Bow', region: 'Sumeru', icon: 'https://enka.network/ui/UI_AvatarIcon_Faruzan.png' },
+      { id: 'layla', name: 'Layla', rarity: 4, element: 'cryo', weapon: 'Sword', region: 'Sumeru', icon: 'https://enka.network/ui/UI_AvatarIcon_Layla.png' },
+      { id: 'dori', name: 'Dori', rarity: 4, element: 'electro', weapon: 'Claymore', region: 'Sumeru', icon: 'https://enka.network/ui/UI_AvatarIcon_Dori.png' },
+      { id: 'collei', name: 'Collei', rarity: 4, element: 'dendro', weapon: 'Bow', region: 'Sumeru', icon: 'https://enka.network/ui/UI_AvatarIcon_Collei.png' },
+      { id: 'candace', name: 'Candace', rarity: 4, element: 'hydro', weapon: 'Polearm', region: 'Sumeru', icon: 'https://enka.network/ui/UI_AvatarIcon_Candace.png' },
+      { id: 'kirara', name: 'Kirara', rarity: 4, element: 'dendro', weapon: 'Sword', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Momoka.png' },
+      { id: 'heizou', name: 'Shikanoin Heizou', rarity: 4, element: 'anemo', weapon: 'Catalyst', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Heizou.png' },
+      { id: 'kuki_shinobu', name: 'Kuki Shinobu', rarity: 4, element: 'electro', weapon: 'Sword', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Shinobu.png' },
+      { id: 'gorou', name: 'Gorou', rarity: 4, element: 'geo', weapon: 'Bow', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Gorou.png' },
+      { id: 'thoma', name: 'Thoma', rarity: 4, element: 'pyro', weapon: 'Polearm', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Thoma.png' },
+      { id: 'sara', name: 'Kujou Sara', rarity: 4, element: 'electro', weapon: 'Bow', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Sara.png' },
+      { id: 'sayu', name: 'Sayu', rarity: 4, element: 'anemo', weapon: 'Claymore', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Sayu.png' },
+      { id: 'yaoyao', name: 'Yaoyao', rarity: 4, element: 'dendro', weapon: 'Polearm', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Yaoyao.png' },
+      { id: 'yun_jin', name: 'Yun Jin', rarity: 4, element: 'geo', weapon: 'Polearm', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Yunjin.png' },
+      { id: 'yanfei', name: 'Yanfei', rarity: 4, element: 'pyro', weapon: 'Catalyst', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Yanfei.png' },
+      { id: 'xinyan', name: 'Xinyan', rarity: 4, element: 'pyro', weapon: 'Claymore', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Xinyan.png' },
+      { id: 'xianglin', name: 'Xiangling', rarity: 4, element: 'pyro', weapon: 'Polearm', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Xiangling.png' },
+      { id: 'xingqiu', name: 'Xingqiu', rarity: 4, element: 'hydro', weapon: 'Sword', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Xingqiu.png' },
+      { id: 'chongyun', name: 'Chongyun', rarity: 4, element: 'cryo', weapon: 'Claymore', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Chongyun.png' },
+      { id: 'ningguang', name: 'Ningguang', rarity: 4, element: 'geo', weapon: 'Catalyst', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Ningguang.png' },
+      { id: 'beidou', name: 'Beidou', rarity: 4, element: 'electro', weapon: 'Claymore', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Beidou.png' },
+      { id: 'mika', name: 'Mika', rarity: 4, element: 'cryo', weapon: 'Polearm', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Mika.png' },
+      { id: 'rosaria', name: 'Rosaria', rarity: 4, element: 'cryo', weapon: 'Polearm', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Rosaria.png' },
+      { id: 'diona', name: 'Diona', rarity: 4, element: 'cryo', weapon: 'Bow', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Diona.png' },
+      { id: 'sucrose', name: 'Sucrose', rarity: 4, element: 'anemo', weapon: 'Catalyst', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Sucrose.png' },
+      { id: 'fischl', name: 'Fischl', rarity: 4, element: 'electro', weapon: 'Bow', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Fischl.png' },
+      { id: 'bennett', name: 'Bennett', rarity: 4, element: 'pyro', weapon: 'Sword', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Bennett.png' },
+      { id: 'noelle', name: 'Noelle', rarity: 4, element: 'geo', weapon: 'Claymore', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Noelle.png' },
+      { id: 'razor', name: 'Razor', rarity: 4, element: 'electro', weapon: 'Claymore', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Razor.png' },
+      { id: 'barbara', name: 'Barbara', rarity: 4, element: 'hydro', weapon: 'Catalyst', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Barbara.png' },
+      { id: 'lisa', name: 'Lisa', rarity: 4, element: 'electro', weapon: 'Catalyst', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Lisa.png' },
+      { id: 'kaeya', name: 'Kaeya', rarity: 4, element: 'cryo', weapon: 'Sword', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Kaeya.png' },
+      { id: 'amber', name: 'Amber', rarity: 4, element: 'pyro', weapon: 'Bow', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Amber.png' }
+    ];
+
+    // --- EXPANDED WEAPON DATABASE ---
+    const WEAPON_DATABASE = [
+      // 5-Star Swords
+      { id: 'mistsplitter', name: 'Mistsplitter Reforged', rarity: 5, type: 'Sword' },
+      { id: 'jade_cutter', name: 'Primordial Jade Cutter', rarity: 5, type: 'Sword' },
+      { id: 'splendor', name: 'Splendor of Tranquil Waters', rarity: 5, type: 'Sword' },
+      { id: 'freedom_sworn', name: 'Freedom-Sworn', rarity: 5, type: 'Sword' },
+      { id: 'haran', name: 'Haran Geppaku Futsu', rarity: 5, type: 'Sword' },
+      { id: 'light_foliar', name: 'Light of Foliar Incision', rarity: 5, type: 'Sword' },
+      { id: 'key_khaj_nisut', name: 'Key of Khaj-Nisut', rarity: 5, type: 'Sword' },
+      { id: 'absolution', name: 'Absolution', rarity: 5, type: 'Sword' },
+      { id: 'peak_patrol', name: 'Peak Patrol Song', rarity: 5, type: 'Sword' },
+      { id: 'skyward_blade', name: 'Skyward Blade', rarity: 5, type: 'Sword' },
+      { id: 'aquila_favonia', name: 'Aquila Favonia', rarity: 5, type: 'Sword' },
+
+      // 4-Star Swords
+      { id: 'fav_sword', name: 'Favonius Sword', rarity: 4, type: 'Sword' },
+      { id: 'sac_sword', name: 'Sacrificial Sword', rarity: 4, type: 'Sword' },
+      { id: 'iron_sting', name: 'Iron Sting', rarity: 4, type: 'Sword' },
+      { id: 'amenoma', name: 'Amenoma Kageuta Blade', rarity: 4, type: 'Sword' },
+      { id: 'fleuve_cendre', name: 'Fleuve Cendre Ferryman', rarity: 4, type: 'Sword' },
+      { id: 'wolf_fang', name: 'Wolf-Fang', rarity: 4, type: 'Sword' },
+      { id: 'the_flute', name: 'The Flute', rarity: 4, type: 'Sword' },
+      { id: 'lions_roar', name: 'Lion\'s Roar', rarity: 4, type: 'Sword' },
+      { id: 'black_sword', name: 'The Black Sword', rarity: 4, type: 'Sword' },
+
+      // 5-Star Claymores
+      { id: 'wolfs_gravestone', name: 'Wolf\'s Gravestone', rarity: 5, type: 'Claymore' },
+      { id: 'redhorn', name: 'Redhorn Stonethresher', rarity: 5, type: 'Claymore' },
+      { id: 'beacon_reed', name: 'Beacon of the Reed Sea', rarity: 5, type: 'Claymore' },
+      { id: 'verdict', name: 'Verdict', rarity: 5, type: 'Claymore' },
+      { id: 'fang_mountain', name: 'Fang of the Mountain King', rarity: 5, type: 'Claymore' },
+      { id: 'pines', name: 'Song of Broken Pines', rarity: 5, type: 'Claymore' },
+      { id: 'skyward_pride', name: 'Skyward Pride', rarity: 5, type: 'Claymore' },
+
+      // 4-Star Claymores
+      { id: 'serpent_spine', name: 'Serpent Spine', rarity: 4, type: 'Claymore' },
+      { id: 'fav_greatsword', name: 'Favonius Greatsword', rarity: 4, type: 'Claymore' },
+      { id: 'sac_greatsword', name: 'Sacrificial Greatsword', rarity: 4, type: 'Claymore' },
+      { id: 'prototype_archaic', name: 'Prototype Archaic', rarity: 4, type: 'Claymore' },
+      { id: 'whiteblind', name: 'Whiteblind', rarity: 4, type: 'Claymore' },
+      { id: 'ultimate_overlord', name: 'Ultimate Overlord\'s Mega Magic Sword', rarity: 4, type: 'Claymore' },
+
+      // 5-Star Polearms
+      { id: 'staff_homa', name: 'Staff of Homa', rarity: 5, type: 'Polearm' },
+      { id: 'engulfing', name: 'Engulfing Lightning', rarity: 5, type: 'Polearm' },
+      { id: 'jade_winged_spear', name: 'Primordial Jade Winged-Spear', rarity: 5, type: 'Polearm' },
+      { id: 'scarlet_sands', name: 'Staff of the Scarlet Sands', rarity: 5, type: 'Polearm' },
+      { id: 'crimson_moon', name: 'Crimson Moon\'s Semblance', rarity: 5, type: 'Polearm' },
+      { id: 'lumidouce', name: 'Lumidouce Elegy', rarity: 5, type: 'Polearm' },
+      { id: 'calamity_queller', name: 'Calamity Queller', rarity: 5, type: 'Polearm' },
+      { id: 'skyward_spine', name: 'Skyward Spine', rarity: 5, type: 'Polearm' },
+
+      // 4-Star Polearms
+      { id: 'fav_lance', name: 'Favonius Lance', rarity: 4, type: 'Polearm' },
+      { id: 'dragons_bane', name: 'Dragon\'s Bane', rarity: 4, type: 'Polearm' },
+      { id: 'the_catch', name: 'The Catch', rarity: 4, type: 'Polearm' },
+      { id: 'deathmatch', name: 'Deathmatch', rarity: 4, type: 'Polearm' },
+      { id: 'ballad_fjords', name: 'Ballad of the Fjords', rarity: 4, type: 'Polearm' },
+      { id: 'wavebreaker', name: 'Wavebreaker\'s Fin', rarity: 4, type: 'Polearm' },
+      { id: 'white_tassel', name: 'White Tassel', rarity: 3, type: 'Polearm' },
+
+      // 5-Star Bows
+      { id: 'aqua_simulacra', name: 'Aqua Simulacra', rarity: 5, type: 'Bow' },
+      { id: 'thundering_pulse', name: 'Thundering Pulse', rarity: 5, type: 'Bow' },
+      { id: 'polar_star', name: 'Polar Star', rarity: 5, type: 'Bow' },
+      { id: 'elegy_end', name: 'Elegy for the End', rarity: 5, type: 'Bow' },
+      { id: 'hunters_path', name: 'Hunter\'s Path', rarity: 5, type: 'Bow' },
+      { id: 'first_great_magic', name: 'The First Great Magic', rarity: 5, type: 'Bow' },
+      { id: 'silvershower', name: 'Silvershower Heartstring', rarity: 5, type: 'Bow' },
+      { id: 'skyward_harp', name: 'Skyward Harp', rarity: 5, type: 'Bow' },
+      { id: 'amos_bow', name: 'Amos\' Bow', rarity: 5, type: 'Bow' },
+
+      // 4-Star Bows
+      { id: 'fav_bow', name: 'Favonius Warbow', rarity: 4, type: 'Bow' },
+      { id: 'sac_bow', name: 'Sacrificial Bow', rarity: 4, type: 'Bow' },
+      { id: 'stringless', name: 'The Stringless', rarity: 4, type: 'Bow' },
+      { id: 'rust', name: 'Rust', rarity: 4, type: 'Bow' },
+      { id: 'viridescent_hunt', name: 'The Viridescent Hunt', rarity: 4, type: 'Bow' },
+      { id: 'hamayumi', name: 'Hamayumi', rarity: 4, type: 'Bow' },
+      { id: 'slingshot', name: 'Slingshot', rarity: 3, type: 'Bow' },
+
+      // 5-Star Catalysts
+      { id: 'tome_flow', name: 'Tome of the Eternal Flow', rarity: 5, type: 'Catalyst' },
+      { id: 'kagura_verity', name: 'Kagura\'s Verity', rarity: 5, type: 'Catalyst' },
+      { id: 'thousand_floating_dreams', name: 'A Thousand Floating Dreams', rarity: 5, type: 'Catalyst' },
+      { id: 'tulaytullah', name: 'Tulaytullah\'s Remembrance', rarity: 5, type: 'Catalyst' },
+      { id: 'cashflow', name: 'Cashflow Supervision', rarity: 5, type: 'Catalyst' },
+      { id: 'crane_echo', name: 'Crane\'s Echoing Call', rarity: 5, type: 'Catalyst' },
+      { id: 'surfs_up', name: 'Surf\'s Up', rarity: 5, type: 'Catalyst' },
+      { id: 'lost_prayer', name: 'Lost Prayer to the Sacred Winds', rarity: 5, type: 'Catalyst' },
+      { id: 'skyward_atlas', name: 'Skyward Atlas', rarity: 5, type: 'Catalyst' },
+
+      // 4-Star Catalysts
+      { id: 'widsith', name: 'The Widsith', rarity: 4, type: 'Catalyst' },
+      { id: 'fav_codex', name: 'Favonius Codex', rarity: 4, type: 'Catalyst' },
+      { id: 'sac_fragments', name: 'Sacrificial Fragments', rarity: 4, type: 'Catalyst' },
+      { id: 'prototype_amber', name: 'Prototype Amber', rarity: 4, type: 'Catalyst' },
+      { id: 'solar_pearl', name: 'Solar Pearl', rarity: 4, type: 'Catalyst' },
+      { id: 'sacrificial_jade', name: 'Sacrificial Jade', rarity: 4, type: 'Catalyst' },
+      { id: 'thrilling_tales', name: 'Thrilling Tales of Dragon Slayers', rarity: 3, type: 'Catalyst' }
+    ];
+
+    const WEAPON_DATABASE = [
+      { id: 'splendor', name: 'Splendor of Tranquil Waters', rarity: 5, type: 'Sword' },
+      { id: 'staff_homa', name: 'Staff of Homa', rarity: 5, type: 'Polearm' },
+      { id: 'mistsplitter', name: 'Mistsplitter Reforged', rarity: 5, type: 'Sword' },
+      { id: 'tome_flow', name: 'Tome of the Eternal Flow', rarity: 5, type: 'Catalyst' },
+      { id: 'aqua_simulacra', name: 'Aqua Simulacra', rarity: 5, type: 'Bow' },
+      { id: 'fav_lance', name: 'Favonius Lance', rarity: 4, type: 'Polearm' },
+      { id: 'fav_sword', name: 'Favonius Sword', rarity: 4, type: 'Sword' },
+      { id: 'widsith', name: 'The Widsith', rarity: 4, type: 'Catalyst' },
+      { id: 'sac_sword', name: 'Sacrificial Sword', rarity: 4, type: 'Sword' }
+    ];
+
+    const DOMAIN_SCHEDULE = {
+      1: { name: 'Monday', talents: ['Freedom', 'Prosperity', 'Transience', 'Admonition', 'Equity', 'Contention'], weapons: ['Decarabian', 'Guyun', 'Distant Sea', 'Copper', 'Mechanical'] },
+      2: { name: 'Tuesday', talents: ['Resistance', 'Diligence', 'Elegant', 'Ingenuity', 'Justice', 'Kindling'], weapons: ['Boreal Wolf', 'Mist Veiled', 'Narukami', 'Oasis Garden', 'Pure Sacred'] },
+      3: { name: 'Wednesday', talents: ['Ballad', 'Gold', 'Light', 'Praxis', 'Order', 'Conflict'], weapons: ['Dandelion Gladiator', 'Aerosiderite', 'Mask', 'Scorching Sun', 'Ancient Chord'] },
+      4: { name: 'Thursday', talents: ['Freedom', 'Prosperity', 'Transience', 'Admonition', 'Equity', 'Contention'], weapons: ['Decarabian', 'Guyun', 'Distant Sea', 'Copper', 'Mechanical'] },
+      5: { name: 'Friday', talents: ['Resistance', 'Diligence', 'Elegant', 'Ingenuity', 'Justice', 'Kindling'], weapons: ['Boreal Wolf', 'Mist Veiled', 'Narukami', 'Oasis Garden', 'Pure Sacred'] },
+      6: { name: 'Saturday', talents: ['Ballad', 'Gold', 'Light', 'Praxis', 'Order', 'Conflict'], weapons: ['Dandelion Gladiator', 'Aerosiderite', 'Mask', 'Scorching Sun', 'Ancient Chord'] },
+      0: { name: 'Sunday', talents: ['All Materials Open'], weapons: ['All Materials Open'] }
+    };
+
+    // --- CLEAN ZERO DEFAULT INITIAL STATE ---
+    const INITIAL_STATE = {
+      version: 3,
+      settings: {
+        theme: 'dark',
+        styleMode: 'genshin',
+        accentColor: 'gold',
+        customAccentHex: '#F0C36A',
+        savingsDisplay: 'split',
+        bannerArt: true,
+        chronicledWishEnabled: true,
+        region: 'America',
+        welkinActive: false,
+        bpActive: false,
+        visibleTabs: ['home', 'pity', 'history', 'planner', 'materials', 'todo', 'characters', 'wishlist']
+      },
+      pity: {
+        character: { count: 0, guaranteed: false, totalWishes: 0, lastFiveStar: null },
+        weapon: { count: 0, guaranteed: false, fatePoints: 0, totalWishes: 0, targetWeapon: null },
+        standard: { count: 0, totalWishes: 0, lastFiveStar: null },
+        chronicled: { count: 0, guaranteed: false, totalWishes: 0, targetItem: null }
+      },
+      savings: {
+        primogems: 0,
+        fatesIntertwined: 0,
+        fatesAcquaint: 0,
+        starglitter: 0,
+        stardust: 0
+      },
+      resin: {
+        current: 200,
+        max: 200,
+        lastUpdated: Date.now()
+      },
+      history: [],
+      wishlist: [],
+      todo: [],
+      characterProgress: {},
+      inventory: {
+        fragileResin: 0,
+        condensedResin: 0,
+        heroWit: 0,
+        mora: 0,
+        crowns: 0
+      }
+    };
+
+    // --- REUSABLE MATERIAL ICON COMPONENT ---
+    function MaterialIcon({ type, className = "w-8 h-8", alt = "Item" }) {
+      const [imgError, setImgError] = useState(false);
+      const url = MATERIAL_ICONS[type] || MATERIAL_ICONS.primogem;
+
+      const emojiFallbacks = {
+        primogem: '💎',
+        intertwined: '✨',
+        acquaint: '🔮',
+        fragileResin: '🧪',
+        condensedResin: '💧',
+        originalResin: '🌙',
+        mora: '🪙',
+        crown: '👑',
+        heroWit: '📜',
+        starglitter: '⭐',
+        stardust: '✨'
+      };
+
+      return (
+        <div className={`relative flex-shrink-0 flex items-center justify-center ${className}`}>
+          {!imgError ? (
+            <img 
+              src={url} 
+              alt={alt} 
+              className="w-full h-full object-contain filter drop-shadow" 
+              onError={() => setImgError(true)} 
+              loading="lazy"
+            />
+          ) : (
+            <span className="text-lg">{emojiFallbacks[type] || '📦'}</span>
+          )}
+        </div>
+      );
+    }
+
+    // --- HELPER COMPONENT FOR CHARACTER ICON ---
+    function CharacterIcon({ character, className = "w-12 h-12", showRarity = true }) {
+      const [imgError, setImgError] = useState(false);
+      
+      const elementColors = {
+        pyro: '#FF6640', hydro: '#33CCFF', anemo: '#00FF99',
+        electro: '#CC80FF', dendro: '#A6E92D', cryo: '#99FFFF', geo: '#FFB300'
+      };
+
+      const rarityBg = character?.rarity === 5 
+        ? 'bg-gradient-to-b from-[#A27137] to-[#F3B942]' 
+        : 'bg-gradient-to-b from-[#56437B] to-[#A974F2]';
+
+      const elementColor = elementColors[character?.element?.toLowerCase()] || '#F0C36A';
+
+      if (!character) return <div className={`${className} bg-gt-raised rounded-xl flex items-center justify-center text-xs font-bold`}>✦</div>;
+
+      return (
+        <div className={`relative rounded-xl overflow-hidden shadow-md flex-shrink-0 ${rarityBg} ${className}`}>
+          {!imgError && character.icon ? (
+            <img 
+              src={character.icon} 
+              alt={character.name} 
+              className="w-full h-full object-cover rounded-xl" 
+              onError={() => setImgError(true)} 
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center p-1 text-center bg-gt-raised">
+              <div className="w-3 h-3 rounded-full mb-1 shadow-sm" style={{ backgroundColor: elementColor }}></div>
+              <span className="text-[10px] font-bold leading-tight line-clamp-2 text-gt-text">{character.name}</span>
+            </div>
+          )}
+          {showRarity && (
+            <div className="absolute bottom-0 inset-x-0 bg-black/60 text-[9px] text-center font-bold text-gt-gold py-[1px]">
+              {character.rarity}★
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // --- SEPARATE TAB COMPONENTS (PREVENTS HOOK RULE VIOLATIONS) ---
+
+    // 1. HOME DASHBOARD TAB
+    function HomeTab({ appData, mutateState, setActiveTab }) {
+      return (
+        <div className="space-y-5 animate-slideUp">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold font-heading text-gt-gold">Traveler Dashboard</h2>
+            <button 
+              onClick={() => setActiveTab('settings')}
+              className="px-3 py-1.5 bg-gt-card border border-gt-border hover:border-gt-gold rounded-xl text-xs font-semibold text-gt-subtext hover:text-gt-text transition flex items-center gap-1.5"
+            >
+              ⚙️ Settings
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Widget: Pity Summary */}
+            <div className="bg-gt-card border border-gt-border rounded-2xl p-4 shadow-lg hover:border-gt-gold/50 transition">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-gt-gold">✨ Pity Counters</span>
+                <button onClick={() => setActiveTab('pity')} className="text-xs text-gt-warmGold hover:underline font-bold">View All →</button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gt-raised p-3 rounded-xl border border-gt-border/50">
+                  <div className="text-[11px] text-gt-subtext font-bold">Character Wish</div>
+                  <div className="text-2xl font-extrabold text-gt-gold my-0.5">{appData.pity.character.count} <span className="text-xs text-gt-subtext font-normal">/ 90</span></div>
+                  <div className="text-[10px] text-gt-subtext flex justify-between">
+                    <span>{appData.pity.character.guaranteed ? "Guaranteed 5★" : "50/50 Status"}</span>
+                    <span className="text-gt-gold font-bold">{appData.pity.character.count >= 74 ? "Soft Pity!" : "Normal"}</span>
+                  </div>
+                </div>
+                <div className="bg-gt-raised p-3 rounded-xl border border-gt-border/50">
+                  <div className="text-[11px] text-gt-subtext font-bold">Weapon Wish</div>
+                  <div className="text-2xl font-extrabold text-gt-warmGold my-0.5">{appData.pity.weapon.count} <span className="text-xs text-gt-subtext font-normal">/ 80</span></div>
+                  <div className="text-[10px] text-gt-subtext flex justify-between">
+                    <span>Fate Pts: {appData.pity.weapon.fatePoints || 0}/1</span>
+                    <span className="text-gt-warmGold font-bold">{appData.pity.weapon.count >= 63 ? "Soft Pity!" : "Normal"}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Widget: Resin Status */}
+            <div className="bg-gt-card border border-gt-border rounded-2xl p-4 shadow-lg hover:border-gt-gold/50 transition">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-gt-gold">🌙 Resin Overview</span>
+                <button onClick={() => setActiveTab('materials')} className="text-xs text-gt-warmGold hover:underline font-bold">Manage →</button>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="relative w-16 h-16 flex-shrink-0 flex items-center justify-center">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                    <path className="text-gt-raised stroke-current" strokeWidth="4" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <path className="text-gt-hydro stroke-current" strokeDasharray={`${(appData.resin.current / appData.resin.max) * 100}, 100`} strokeWidth="4" strokeLinecap="round" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  </svg>
+                  <span className="absolute font-extrabold text-sm text-gt-text">{appData.resin.current}</span>
+                </div>
+                <div className="flex-1">
+                  <div className="text-xs font-semibold text-gt-subtext mb-1">
+                    {appData.resin.current >= 200 ? "Resin Full!" : `Full in ~${Math.ceil((200 - appData.resin.current) * 8 / 60)} hrs`}
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <button 
+                      onClick={() => mutateState(p => ({ ...p, resin: { ...p.resin, current: Math.max(0, p.resin.current - 20) } }), "Spent 20 Resin")}
+                      className="px-2.5 py-1 bg-gt-raised border border-gt-border rounded-lg text-xs font-bold text-gt-subtext hover:text-gt-gold transition"
+                    >
+                      -20
+                    </button>
+                    <button 
+                      onClick={() => mutateState(p => ({ ...p, resin: { ...p.resin, current: Math.max(0, p.resin.current - 40) } }), "Spent 40 Condensed")}
+                      className="px-2.5 py-1 bg-gt-raised border border-gt-border rounded-lg text-xs font-bold text-gt-subtext hover:text-gt-gold transition"
+                    >
+                      -40 Condensed
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Widget: Farmable Domains Today */}
+            <div className="bg-gt-card border border-gt-border rounded-2xl p-4 shadow-lg hover:border-gt-gold/50 transition">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-gt-gold">⚔️ Today's Domain Schedule</span>
+                <span className="text-[11px] text-gt-subtext font-semibold">{DOMAIN_SCHEDULE[new Date().getDay()].name}</span>
+              </div>
+              <div className="space-y-2 mt-3">
+                <div className="text-xs text-gt-subtext"><strong className="text-gt-text">Talent Books:</strong> {DOMAIN_SCHEDULE[new Date().getDay()].talents.join(', ')}</div>
+                <div className="text-xs text-gt-subtext"><strong className="text-gt-text">Weapon Mats:</strong> {DOMAIN_SCHEDULE[new Date().getDay()].weapons.join(', ')}</div>
+              </div>
+            </div>
+
+            {/* Widget: Primogem Savings */}
+            <div className="bg-gt-card border border-gt-border rounded-2xl p-4 shadow-lg hover:border-gt-gold/50 transition">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-gt-gold">💎 Primogem Savings</span>
+                <button onClick={() => setActiveTab('planner')} className="text-xs text-gt-warmGold hover:underline font-bold">Planner →</button>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+                <div className="bg-gt-raised p-2 rounded-xl">
+                  <div className="text-[10px] text-gt-subtext font-bold">Primogems</div>
+                  <div className="text-base font-extrabold text-gt-gold">{appData.savings.primogems || 0}</div>
+                </div>
+                <div className="bg-gt-raised p-2 rounded-xl">
+                  <div className="text-[10px] text-gt-subtext font-bold">Intertwined</div>
+                  <div className="text-base font-extrabold text-gt-r5">{appData.savings.fatesIntertwined || 0}</div>
+                </div>
+                <div className="bg-gt-raised p-2 rounded-xl">
+                  <div className="text-[10px] text-gt-subtext font-bold">Total Wishes</div>
+                  <div className="text-base font-extrabold text-gt-text">
+                    {Math.floor((appData.savings.primogems || 0) / 160) + (appData.savings.fatesIntertwined || 0)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 2. PITY TRACKER TAB
+    function PityTab({ appData, mutateState, setConfirmModal, setLogModalBanner, handleUndo, lastStateHistory, totalPrimogemsSpent, totalWishesSpent }) {
+      const banners = [
+        { key: 'character', name: 'Character Event Wish', maxPity: 90, softPity: 74, color: 'from-[#A27137] to-[#F3B942]' },
+        { key: 'weapon', name: 'Weapon Event Wish', maxPity: 80, softPity: 63, color: 'from-[#70522B] to-[#FFB259]' },
+        { key: 'standard', name: 'Standard Wish', maxPity: 90, softPity: 74, color: 'from-[#2B4B70] to-[#5AA0F2]' },
+        ...(appData.settings.chronicledWishEnabled ? [{ key: 'chronicled', name: 'Chronicled Wish', maxPity: 90, softPity: 74, color: 'from-[#4F306B] to-[#A974F2]' }] : [])
+      ];
+
+      return (
+        <div className="space-y-6 animate-slideUp">
+          <div className="bg-gradient-to-r from-gt-card via-gt-raised to-gt-card border border-gt-border rounded-3xl p-5 shadow-xl relative overflow-hidden">
+            <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <div className="text-xs uppercase tracking-wider font-extrabold text-gt-subtext">Lifetime Wish Statistics</div>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl font-extrabold text-gradient-gold">{totalPrimogemsSpent.toLocaleString()}</span>
+                  <span className="text-xs text-gt-subtext font-bold">Primogems Equivalent ({totalWishesSpent} Wishes)</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button 
+                  onClick={handleUndo} 
+                  disabled={lastStateHistory.length === 0}
+                  className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold border transition ${lastStateHistory.length > 0 ? 'bg-gt-raised border-gt-gold text-gt-gold hover:bg-gt-gold hover:text-black' : 'bg-gt-raised/40 border-gt-border text-gt-subtext/40 cursor-not-allowed'}`}
+                >
+                  ↩️ Undo
+                </button>
+                <button 
+                  onClick={() => {
+                    setConfirmModal({
+                      title: "Reset All Pity Counters?",
+                      message: "Are you sure you want to reset pity counters for all banners back to 0?",
+                      onConfirm: () => {
+                        mutateState(p => ({ ...p, pity: INITIAL_STATE.pity }), "Pity Counters Reset");
+                        setConfirmModal(null);
+                      }
+                    });
+                  }}
+                  className="flex-1 sm:flex-none px-4 py-2 bg-red-500/10 border border-red-500/30 hover:border-red-500 text-red-400 rounded-xl text-xs font-bold transition"
+                >
+                  🗑️ Reset All
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-5">
+            {banners.map(b => {
+              const pityData = appData.pity[b.key] || { count: 0, guaranteed: false };
+              const isSoftPity = pityData.count >= b.softPity;
+              const isHardPity = pityData.count >= b.maxPity;
+              const pullsToSoft = Math.max(0, b.softPity - pityData.count);
+              const pullsToHard = Math.max(0, b.maxPity - pityData.count);
+
+              let currentRate = b.key === 'weapon' ? 0.7 : 0.6;
+              if (isSoftPity) currentRate += (pityData.count - b.softPity + 1) * 6.0;
+              if (isHardPity) currentRate = 100;
+
+              const primosToSoft = pullsToSoft * 160;
+              const primosToHard = pullsToHard * 160;
+
+              return (
+                <div key={b.key} className="bg-gt-card border border-gt-border hover:border-gt-gold/40 rounded-3xl p-5 shadow-xl transition relative overflow-hidden">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <span className="text-xs font-bold text-gt-subtext uppercase tracking-wider">Banner Tracker</span>
+                      <h3 className="text-xl font-black font-heading text-gt-text mt-0.5">{b.name}</h3>
+                    </div>
+                    
+                    {('guaranteed' in pityData) && (
+                      <button 
+                        onClick={() => mutateState(p => ({
+                          ...p,
+                          pity: {
+                            ...p.pity,
+                            [b.key]: { ...p.pity[b.key], guaranteed: !p.pity[b.key].guaranteed }
+                          }
+                        }), `${b.name} guarantee toggled`)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-extrabold border transition ${pityData.guaranteed ? 'bg-gt-gold/20 border-gt-gold text-gt-gold' : 'bg-gt-raised border-gt-border text-gt-subtext hover:border-gt-gold/50'}`}
+                      >
+                        {pityData.guaranteed ? '✨ Next 5★ Guaranteed' : '⚖️ 50/50 Chance'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-center my-4">
+                    <div className="text-center md:text-left">
+                      <div className="text-xs font-bold text-gt-subtext">Current Pity</div>
+                      <div className="text-5xl font-black font-heading text-gt-gold my-1">{pityData.count} <span className="text-lg font-normal text-gt-subtext">/ {b.maxPity}</span></div>
+                      <div className="text-xs font-semibold text-gt-subtext">
+                        Total Wishes Logged: <strong className="text-gt-text">{pityData.totalWishes || 0}</strong>
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-2 space-y-3">
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className={isSoftPity ? "text-gt-gold font-extrabold" : "text-gt-subtext"}>
+                            {isSoftPity ? "⚡ SOFT PITY ACTIVE!" : `Soft Pity in ${pullsToSoft} wishes`}
+                          </span>
+                          <span className="text-gt-subtext">Hard Pity: {pullsToHard} wishes</span>
+                        </div>
+                        <div className="w-full h-4 bg-gt-raised border border-gt-border rounded-full p-0.5 relative overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r ${b.color}`}
+                            style={{ width: `${Math.min(100, (pityData.count / b.maxPity) * 100)}%` }}
+                          ></div>
+                          <div 
+                            className="absolute top-0 bottom-0 w-0.5 bg-gt-gold z-10 opacity-80" 
+                            style={{ left: `${(b.softPity / b.maxPity) * 100}%` }}
+                            title="Soft Pity Threshold"
+                          ></div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-gt-raised p-2 rounded-xl border border-gt-border/40">
+                          <div className="text-[10px] font-bold text-gt-subtext">Next Pull Chance</div>
+                          <div className="text-sm font-extrabold text-gt-gold">{currentRate.toFixed(1)}%</div>
+                        </div>
+                        <div className="bg-gt-raised p-2 rounded-xl border border-gt-border/40">
+                          <div className="text-[10px] font-bold text-gt-subtext">To Soft Pity</div>
+                          <div className="text-sm font-extrabold text-gt-text">{primosToSoft} 💎</div>
+                        </div>
+                        <div className="bg-gt-raised p-2 rounded-xl border border-gt-border/40">
+                          <div className="text-[10px] font-bold text-gt-subtext">To Guaranteed</div>
+                          <div className="text-sm font-extrabold text-gt-warmGold">{primosToHard} 💎</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-gt-border/50">
+                    <button 
+                      onClick={() => mutateState(p => ({
+                        ...p,
+                        pity: {
+                          ...p.pity,
+                          [b.key]: {
+                            ...p.pity[b.key],
+                            count: p.pity[b.key].count + 1,
+                            totalWishes: (p.pity[b.key].totalWishes || 0) + 1
+                          }
+                        }
+                      }), `+1 Pull on ${b.name}`)}
+                      className="flex-1 min-w-[100px] py-2.5 bg-gradient-to-r from-gt-gold to-gt-warmGold text-black font-extrabold text-xs rounded-xl hover:opacity-90 transition active:scale-95 shadow-md"
+                    >
+                      +1 Wish
+                    </button>
+
+                    <button 
+                      onClick={() => mutateState(p => ({
+                        ...p,
+                        pity: {
+                          ...p.pity,
+                          [b.key]: {
+                            ...p.pity[b.key],
+                            count: p.pity[b.key].count + 10,
+                            totalWishes: (p.pity[b.key].totalWishes || 0) + 10
+                          }
+                        }
+                      }), `+10 Pulls on ${b.name}`)}
+                      className="flex-1 min-w-[100px] py-2.5 bg-gt-raised border border-gt-gold text-gt-gold font-extrabold text-xs rounded-xl hover:bg-gt-gold hover:text-black transition active:scale-95 shadow-md"
+                    >
+                      +10 Wishes
+                    </button>
+
+                    <button 
+                      onClick={() => setLogModalBanner(b.key)}
+                      className="py-2.5 px-4 bg-gt-raised border border-gt-border hover:border-gt-gold text-gt-subtext hover:text-gt-text font-bold text-xs rounded-xl transition"
+                    >
+                      ⭐ Log 4★/5★
+                    </button>
+
+                    <button 
+                      onClick={() => {
+                        setConfirmModal({
+                          title: `Reset Counter for ${b.name}?`,
+                          message: "Are you sure you want to reset this banner's pity back to 0?",
+                          onConfirm: () => {
+                            mutateState(p => ({
+                              ...p,
+                              pity: { ...p.pity, [b.key]: { ...p.pity[b.key], count: 0 } }
+                            }), `${b.name} reset`);
+                            setConfirmModal(null);
+                          }
+                        });
+                      }}
+                      className="py-2.5 px-3 bg-red-500/10 border border-red-500/20 hover:border-red-500 text-red-400 rounded-xl text-xs font-bold transition"
+                      title="Reset Counter"
+                    >
+                      ↺
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // 3. WISH HISTORY TAB
+    function HistoryTab({ appData, mutateState, showToast, setLogModalBanner }) {
+      return (
+        <div className="space-y-5 animate-slideUp">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h2 className="text-2xl font-bold font-heading text-gt-gold">Wish History Log</h2>
+              <p className="text-xs text-gt-subtext">Review and manage past pulls</p>
+            </div>
+            
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setLogModalBanner('character')}
+                className="px-3 py-1.5 bg-gt-gold text-black rounded-xl text-xs font-extrabold hover:opacity-90 transition"
+              >
+                + Add Manual Pull
+              </button>
+              <button 
+                onClick={() => {
+                  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
+                  const downloadAnchor = document.createElement('a');
+                  downloadAnchor.setAttribute("href", dataStr);
+                  downloadAnchor.setAttribute("download", `genshin_track_backup_${new Date().toISOString().slice(0,10)}.json`);
+                  document.body.appendChild(downloadAnchor);
+                  downloadAnchor.click();
+                  downloadAnchor.remove();
+                  showToast("Exported Backup JSON!");
+                }}
+                className="px-3 py-1.5 bg-gt-raised border border-gt-border hover:border-gt-gold rounded-xl text-xs font-bold text-gt-subtext hover:text-gt-text transition"
+              >
+                📥 Export Backup
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-gt-card border border-gt-border p-3 rounded-2xl text-center">
+              <div className="text-[11px] font-bold text-gt-subtext">Total Recorded Pulls</div>
+              <div className="text-xl font-extrabold text-gt-gold mt-1">{(appData.history || []).length}</div>
+            </div>
+            <div className="bg-gt-card border border-gt-border p-3 rounded-2xl text-center">
+              <div className="text-[11px] font-bold text-gt-subtext">5★ Items Obtained</div>
+              <div className="text-xl font-extrabold text-gt-r5 mt-1">
+                {(appData.history || []).filter(h => h.rarity === 5).length}
+              </div>
+            </div>
+            <div className="bg-gt-card border border-gt-border p-3 rounded-2xl text-center">
+              <div className="text-[11px] font-bold text-gt-subtext">Average 5★ Pity</div>
+              <div className="text-xl font-extrabold text-gt-warmGold mt-1">
+                {(() => {
+                  const fives = (appData.history || []).filter(h => h.rarity === 5);
+                  if (fives.length === 0) return 'N/A';
+                  const sum = fives.reduce((acc, curr) => acc + (curr.pity || 0), 0);
+                  return Math.round(sum / fives.length);
+                })()}
+              </div>
+            </div>
+            <div className="bg-gt-card border border-gt-border p-3 rounded-2xl text-center">
+              <div className="text-[11px] font-bold text-gt-subtext">4★ Items Logged</div>
+              <div className="text-xl font-extrabold text-gt-r4 mt-1">
+                {(appData.history || []).filter(h => h.rarity === 4).length}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gt-card border border-gt-border rounded-2xl overflow-hidden shadow-lg">
+            {(!appData.history || appData.history.length === 0) ? (
+              <div className="p-12 text-center text-gt-subtext space-y-2">
+                <div className="text-4xl">📜</div>
+                <div className="text-sm font-bold">No Wish History Logged Yet</div>
+                <div className="text-xs">Log pulls manually or use the "+1 Wish" button in the Pity tab!</div>
+              </div>
+            ) : (
+              <div className="divide-y divide-gt-border/50">
+                {appData.history.map((item, idx) => {
+                  const matchedChar = CHARACTER_DATABASE.find(c => c.name.toLowerCase() === item.item.toLowerCase());
+                  return (
+                    <div key={item.id || idx} className="p-3.5 flex items-center justify-between hover:bg-gt-raised/50 transition">
+                      <div className="flex items-center gap-3">
+                        <CharacterIcon character={matchedChar || { name: item.item, rarity: item.rarity }} className="w-10 h-10" />
+                        <div>
+                          <div className={`text-sm font-extrabold ${item.rarity === 5 ? 'text-gt-r5' : item.rarity === 4 ? 'text-gt-r4' : 'text-gt-text'}`}>
+                            {item.item}
+                          </div>
+                          <div className="text-[11px] text-gt-subtext capitalize">
+                            {item.banner} Banner • {item.date || 'Recent'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="text-xs font-bold text-gt-gold">{item.pity ? `${item.pity} Pity` : ''}</div>
+                          <div className="text-[10px] text-gt-subtext">{item.rarity}★ Item</div>
+                        </div>
+
+                        <button 
+                          onClick={() => mutateState(p => ({ ...p, history: p.history.filter(h => h.id !== item.id) }), "Removed item")}
+                          className="text-gt-subtext hover:text-red-400 p-1 rounded-lg text-xs"
+                          title="Delete"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // 4. SAVINGS PLANNER TAB (INDEPENDENT COMPONENT)
+    function PlannerTab({ appData, mutateState }) {
+      const [targetDate, setTargetDate] = useState(() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 30);
+        return d.toISOString().slice(0, 10);
+      });
+
+      const [welkin, setWelkin] = useState(appData.settings.welkinActive || false);
+      const [abyssRuns, setAbyssRuns] = useState(1);
+      const [selectedGoalId, setSelectedGoalId] = useState('custom');
+      const [customWishGoal, setCustomWishGoal] = useState(90);
+
+      const currentPrimos = appData.savings.primogems || 0;
+      const currentFates = appData.savings.fatesIntertwined || 0;
+      const currentStarglitter = appData.savings.starglitter || 0;
+
+      const daysRemaining = Math.max(1, Math.ceil((new Date(targetDate) - new Date()) / (1000 * 60 * 60 * 24)));
+      const dailyPrimos = 60 + (welkin ? 90 : 0);
+      const projectedDailyPrimos = daysRemaining * dailyPrimos;
+      const projectedAbyssPrimos = abyssRuns * 600;
+      
+      const totalProjectedPrimos = currentPrimos + projectedDailyPrimos + projectedAbyssPrimos;
+      const totalProjectedWishes = Math.floor(totalProjectedPrimos / 160) + currentFates + Math.floor(currentStarglitter / 5);
+
+      let targetWishesNeeded = customWishGoal;
+      if (selectedGoalId !== 'custom') {
+        const selectedGoal = (appData.wishlist || []).find(w => w.id === selectedGoalId);
+        if (selectedGoal) targetWishesNeeded = selectedGoal.wishBudget || 90;
+      }
+
+      const shortfallWishes = Math.max(0, targetWishesNeeded - totalProjectedWishes);
+      const extraPrimosNeeded = shortfallWishes * 160;
+      const extraPrimosDailyNeeded = Math.ceil(extraPrimosNeeded / daysRemaining);
+
+      return (
+        <div className="space-y-5 animate-slideUp">
+          <h2 className="text-2xl font-bold font-heading text-gt-gold">Savings & Banner Planner</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gt-card border border-gt-border rounded-2xl p-4 space-y-4 shadow-lg">
+              <h3 className="text-sm font-extrabold text-gt-gold uppercase tracking-wider">Planner Inputs</h3>
+
+              <div>
+                <label className="text-xs font-bold text-gt-subtext block mb-1">Target Banner End Date</label>
+                <input 
+                  type="date" 
+                  value={targetDate} 
+                  onChange={e => setTargetDate(e.target.value)}
+                  className="w-full bg-gt-raised border border-gt-border rounded-xl p-2.5 text-xs font-bold text-gt-text focus:outline-none focus:border-gt-gold"
+                />
+                <span className="text-[10px] text-gt-subtext mt-1 block">{daysRemaining} days remaining</span>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gt-subtext block mb-1">Select Target Goal</label>
+                <select 
+                  value={selectedGoalId} 
+                  onChange={e => setSelectedGoalId(e.target.value)}
+                  className="w-full bg-gt-raised border border-gt-border rounded-xl p-2.5 text-xs font-bold text-gt-text focus:outline-none focus:border-gt-gold"
+                >
+                  <option value="custom">Custom Wish Goal</option>
+                  {(appData.wishlist || []).map(w => (
+                    <option key={w.id} value={w.id}>{w.name} ({w.wishBudget || 90} Wishes)</option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedGoalId === 'custom' && (
+                <div>
+                  <label className="text-xs font-bold text-gt-subtext block mb-1">Wish Goal Count</label>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    value={customWishGoal} 
+                    onChange={e => setCustomWishGoal(parseInt(e.target.value) || 1)}
+                    className="w-full bg-gt-raised border border-gt-border rounded-xl p-2 text-xs font-bold text-gt-gold focus:outline-none"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2 pt-2 border-t border-gt-border">
+                <div className="flex items-center justify-between bg-gt-raised p-2.5 rounded-xl border border-gt-border">
+                  <div>
+                    <div className="text-xs font-bold text-gt-text">Welkin Moon</div>
+                    <div className="text-[10px] text-gt-subtext">+90 Primos daily</div>
+                  </div>
+                  <input 
+                    type="checkbox" 
+                    checked={welkin} 
+                    onChange={e => {
+                      setWelkin(e.target.checked);
+                      mutateState(p => ({ ...p, settings: { ...p.settings, welkinActive: e.target.checked } }));
+                    }}
+                    className="w-4 h-4 accent-gt-gold"
+                  />
+                </div>
+
+                <div className="flex justify-between items-center bg-gt-raised p-2.5 rounded-xl border border-gt-border">
+                  <div className="text-xs font-bold text-gt-text">Spiral Abyss Clears</div>
+                  <input 
+                    type="number" 
+                    min="0" 
+                    max="10" 
+                    value={abyssRuns} 
+                    onChange={e => setAbyssRuns(parseInt(e.target.value) || 0)}
+                    className="w-16 bg-gt-card border border-gt-border rounded-lg p-1 text-center font-bold text-gt-gold"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-gt-border">
+                <div className="text-xs font-bold text-gt-subtext">Current Vault Inventory</div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="flex items-center gap-1"><MaterialIcon type="primogem" className="w-5 h-5" /> Primogems:</span>
+                  <input 
+                    type="number" 
+                    min="0"
+                    value={appData.savings.primogems || 0} 
+                    onChange={e => mutateState(p => ({ ...p, savings: { ...p.savings, primogems: parseInt(e.target.value) || 0 } }))}
+                    className="w-24 bg-gt-raised border border-gt-border rounded-lg p-1 text-right font-bold text-gt-gold"
+                  />
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="flex items-center gap-1"><MaterialIcon type="intertwined" className="w-5 h-5" /> Fates:</span>
+                  <input 
+                    type="number" 
+                    min="0"
+                    value={appData.savings.fatesIntertwined || 0} 
+                    onChange={e => mutateState(p => ({ ...p, savings: { ...p.savings, fatesIntertwined: parseInt(e.target.value) || 0 } }))}
+                    className="w-24 bg-gt-raised border border-gt-border rounded-lg p-1 text-right font-bold text-gt-r5"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gt-card border border-gt-border rounded-2xl p-5 shadow-lg md:col-span-2 flex flex-col justify-between">
+              <div>
+                <div className="text-xs font-bold text-gt-subtext uppercase tracking-wider">Projected Outcome</div>
+                <div className="text-3xl font-black text-gradient-gold my-2">
+                  {totalProjectedWishes} <span className="text-sm font-normal text-gt-subtext">Total Wishes Available by Target Date</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 my-4">
+                  <div className="bg-gt-raised p-3 rounded-xl border border-gt-border/50">
+                    <div className="text-[10px] text-gt-subtext font-bold">Estimated Total Primos</div>
+                    <div className="text-base font-extrabold text-gt-gold">{totalProjectedPrimos.toLocaleString()} 💎</div>
+                  </div>
+                  <div className="bg-gt-raised p-3 rounded-xl border border-gt-border/50">
+                    <div className="text-[10px] text-gt-subtext font-bold">Goal Wish Need</div>
+                    <div className="text-base font-extrabold text-gt-warmGold">{targetWishesNeeded} Wishes</div>
+                  </div>
+                  <div className="bg-gt-raised p-3 rounded-xl border border-gt-border/50 col-span-2 sm:col-span-1">
+                    <div className="text-[10px] text-gt-subtext font-bold">Daily Primo Yield</div>
+                    <div className="text-base font-extrabold text-gt-hydro">{dailyPrimos} / day</div>
+                  </div>
+                </div>
+
+                <div className={`p-4 rounded-xl border font-bold text-xs ${shortfallWishes === 0 ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                  {shortfallWishes === 0 ? (
+                    <div>🎉 Target Achievable! You are projected to have enough wishes for your goal by {targetDate}.</div>
+                  ) : (
+                    <div>⚠️ Shortfall of {shortfallWishes} wishes ({extraPrimosNeeded} Primogems). You need ~{extraPrimosDailyNeeded} extra Primogems daily from events or exploration.</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="text-[11px] text-gt-subtext mt-4">
+                * Daily yield includes Daily Commissions (60) + Welkin Moon (90) if active. Spiral Abyss and events provide additional rewards.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 5. MATERIALS TAB
+    function MaterialsTab({ appData, mutateState }) {
+      const dayIdx = new Date().getDay();
+      const todaySchedule = DOMAIN_SCHEDULE[dayIdx];
+
+      return (
+        <div className="space-y-5 animate-slideUp">
+          <h2 className="text-2xl font-bold font-heading text-gt-gold">Materials & Resin Manager</h2>
+
+          <div className="bg-gt-card border border-gt-border rounded-2xl p-5 shadow-lg">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <MaterialIcon type="originalResin" className="w-14 h-14" />
+                <div>
+                  <div className="text-xs font-bold text-gt-subtext">Original Resin Counter</div>
+                  <div className="text-3xl font-black text-gt-text my-0.5">{appData.resin.current} <span className="text-sm font-normal text-gt-subtext">/ 200</span></div>
+                  <div className="text-xs text-gt-hydro font-bold">
+                    {appData.resin.current >= 200 ? "Cap Reached!" : `Fully Replenished in ${Math.ceil((200 - appData.resin.current) * 8 / 60)} Hours`}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                <button 
+                  onClick={() => mutateState(p => ({ ...p, resin: { ...p.resin, current: Math.min(200, p.resin.current + 60) } }), "Added 60 Resin (Fragile)")}
+                  className="px-3 py-2 bg-gt-raised border border-gt-border hover:border-gt-gold rounded-xl text-xs font-bold text-gt-gold transition flex items-center gap-1.5"
+                >
+                  <MaterialIcon type="fragileResin" className="w-4 h-4" /> +60 Fragile
+                </button>
+                <button 
+                  onClick={() => mutateState(p => ({ ...p, resin: { ...p.resin, current: 200 } }), "Resin set to Max")}
+                  className="px-3 py-2 bg-gt-raised border border-gt-border hover:border-gt-gold rounded-xl text-xs font-bold text-gt-subtext transition"
+                >
+                  Max (200)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gt-card border border-gt-border rounded-2xl p-5 shadow-lg space-y-3">
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-extrabold text-gt-gold">⚔️ Today's Farmable Domains ({todaySchedule.name})</h3>
+              <span className="text-xs px-2.5 py-1 bg-gt-raised rounded-full text-gt-subtext border border-gt-border font-bold">Server Day</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gt-raised p-4 rounded-xl border border-gt-border/50">
+                <div className="text-xs font-bold text-gt-warmGold uppercase mb-2">Talent Level-Up Books</div>
+                <div className="flex flex-wrap gap-2">
+                  {todaySchedule.talents.map((t, idx) => (
+                    <span key={idx} className="px-2.5 py-1 bg-gt-card border border-gt-border rounded-lg text-xs font-bold text-gt-text">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-gt-raised p-4 rounded-xl border border-gt-border/50">
+                <div className="text-xs font-bold text-gt-hydro uppercase mb-2">Weapon Ascension Materials</div>
+                <div className="flex flex-wrap gap-2">
+                  {todaySchedule.weapons.map((w, idx) => (
+                    <span key={idx} className="px-2.5 py-1 bg-gt-card border border-gt-border rounded-lg text-xs font-bold text-gt-text">
+                      {w}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 6. TO-DO CHECKLIST TAB (INDEPENDENT COMPONENT)
+    // 7. CHARACTERS TAB & BUILDER COMPONENT
+    function CharactersTab({ appData, mutateState }) {
+      const [filterElement, setFilterElement] = useState('all');
+      const [filterWeapon, setFilterWeapon] = useState('all');
+      const [filterOwned, setFilterOwned] = useState('all');
+      const [filterRarity, setFilterRarity] = useState('all');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [sortBy, setSortBy] = useState('rarity');
+      const [editingChar, setEditingChar] = useState(null);
+
+      // Default structure for unconfigured characters
+      const getProgression = useCallback((charId) => {
+        const defaultChar = CHARACTER_DATABASE.find(c => c.id === charId);
+        const matchingWeapon = WEAPON_DATABASE.find(w => w.type === defaultChar?.weapon) || WEAPON_DATABASE[0];
+        
+        return (appData.characterProgress && appData.characterProgress[charId]) || {
+          owned: false,
+          level: 1,
+          constellation: 0,
+          weaponId: matchingWeapon?.id || '',
+          weaponLevel: 1,
+          refinement: 1,
+          talents: { normal: 1, skill: 1, burst: 1 },
+          notes: ''
+        };
+      }, [appData.characterProgress]);
+
+      // Filter and sort roster
+      const filteredCharacters = useMemo(() => {
+        return CHARACTER_DATABASE.filter(c => {
+          const prog = getProgression(c.id);
+          if (filterElement !== 'all' && c.element.toLowerCase() !== filterElement) return false;
+          if (filterWeapon !== 'all' && c.weapon.toLowerCase() !== filterWeapon) return false;
+          if (filterRarity !== 'all' && c.rarity !== parseInt(filterRarity)) return false;
+          if (filterOwned === 'owned' && !prog.owned) return false;
+          if (filterOwned === 'unowned' && prog.owned) return false;
+          if (searchQuery.trim() && !c.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+          return true;
+        }).sort((a, b) => {
+          const progA = getProgression(a.id);
+          const progB = getProgression(b.id);
+          if (sortBy === 'rarity') {
+            if (b.rarity !== a.rarity) return b.rarity - a.rarity;
+            return a.name.localeCompare(b.name);
+          }
+          if (sortBy === 'level') return progB.level - progA.level;
+          if (sortBy === 'constellation') return progB.constellation - progA.constellation;
+          return a.name.localeCompare(b.name);
+        });
+      }, [filterElement, filterWeapon, filterOwned, filterRarity, searchQuery, sortBy, getProgression]);
+
+      const ownedCount = useMemo(() => {
+        return Object.values(appData.characterProgress || {}).filter(p => p.owned).length;
+      }, [appData.characterProgress]);
+
+      const maxLevelCount = useMemo(() => {
+        return Object.values(appData.characterProgress || {}).filter(p => p.owned && p.level === 90).length;
+      }, [appData.characterProgress]);
+
+      const c6Count = useMemo(() => {
+        return Object.values(appData.characterProgress || {}).filter(p => p.owned && p.constellation === 6).length;
+      }, [appData.characterProgress]);
+
+      return (
+        <div className="space-y-5 animate-slideUp">
+          {/* Header & Overview Stats */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h2 className="text-2xl font-bold font-heading text-gt-gold">Character Roster & Builder</h2>
+              <p className="text-xs text-gt-subtext">Manage weapons, levels, constellations, and talents for every character</p>
+            </div>
+
+            <div className="flex items-center gap-2 bg-gt-card border border-gt-border px-3 py-1.5 rounded-2xl text-xs">
+              <span className="font-bold text-gt-gold">{ownedCount} / {CHARACTER_DATABASE.length} Owned</span>
+              <span className="text-gt-border">|</span>
+              <span className="text-gt-subtext">{maxLevelCount} Max Lvl 90</span>
+              <span className="text-gt-border">|</span>
+              <span className="text-gt-subtext">{c6Count} C6</span>
+            </div>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div className="bg-gt-card border border-gt-border rounded-2xl p-4 shadow-lg space-y-3">
+            <div className="flex flex-wrap sm:flex-nowrap gap-2">
+              <div className="relative flex-1">
+                <input 
+                  type="text"
+                  placeholder="Search character name..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full bg-gt-raised border border-gt-border rounded-xl pl-9 pr-3 py-2 text-xs font-bold text-gt-text focus:outline-none focus:border-gt-gold"
+                />
+                <span className="absolute left-3 top-2.5 text-xs text-gt-subtext">🔍</span>
+              </div>
+
+              <select 
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value)}
+                className="bg-gt-raised border border-gt-border rounded-xl px-3 py-2 text-xs font-bold text-gt-subtext focus:outline-none"
+              >
+                <option value="rarity">Sort by Rarity</option>
+                <option value="name">Sort by Name</option>
+                <option value="level">Sort by Level</option>
+                <option value="constellation">Sort by Constellation</option>
+              </select>
+
+              <select 
+                value={filterOwned}
+                onChange={e => setFilterOwned(e.target.value)}
+                className="bg-gt-raised border border-gt-border rounded-xl px-3 py-2 text-xs font-bold text-gt-subtext focus:outline-none"
+              >
+                <option value="all">All Status</option>
+                <option value="owned">Owned Only</option>
+                <option value="unowned">Unowned Only</option>
+              </select>
+            </div>
+
+            {/* Element Filter Pills */}
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {['all', 'pyro', 'hydro', 'anemo', 'electro', 'dendro', 'cryo', 'geo'].map(el => (
+                <button 
+                  key={el}
+                  onClick={() => setFilterElement(el)}
+                  className={`px-3 py-1 rounded-xl text-xs font-extrabold capitalize transition ${filterElement === el ? 'bg-gt-gold text-black shadow-md' : 'bg-gt-raised border border-gt-border/60 text-gt-subtext hover:text-gt-text'}`}
+                >
+                  {el}
+                </button>
+              ))}
+
+              <div className="h-4 w-[1px] bg-gt-border self-center mx-1"></div>
+
+              {['all', 'sword', 'claymore', 'polearm', 'bow', 'catalyst'].map(w => (
+                <button 
+                  key={w}
+                  onClick={() => setFilterWeapon(w)}
+                  className={`px-2.5 py-1 rounded-xl text-xs font-extrabold capitalize transition ${filterWeapon === w ? 'bg-gt-warmGold text-black shadow-md' : 'bg-gt-raised border border-gt-border/60 text-gt-subtext hover:text-gt-text'}`}
+                >
+                  {w}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Character Grid Roster */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filteredCharacters.length === 0 ? (
+              <div className="col-span-full bg-gt-card border border-gt-border rounded-2xl p-10 text-center text-gt-subtext text-xs space-y-2">
+                <div className="text-3xl">🔍</div>
+                <div className="font-bold">No characters match your current filters</div>
+                <div>Try adjusting element, weapon type, or search queries!</div>
+              </div>
+            ) : (
+              filteredCharacters.map(char => {
+                const prog = getProgression(char.id);
+                const equippedWeapon = WEAPON_DATABASE.find(w => w.id === prog.weaponId);
+
+                return (
+                  <div 
+                    key={char.id} 
+                    className={`bg-gt-card border hover:border-gt-gold/80 rounded-2xl p-3.5 shadow-md transition flex flex-col justify-between relative overflow-hidden ${prog.owned ? 'border-gt-border' : 'border-gt-border/40 opacity-70 hover:opacity-100'}`}
+                  >
+                    {/* Character Card Header */}
+                    <div>
+                      <div className="flex items-start gap-3">
+                        <CharacterIcon character={char} className="w-14 h-14" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start">
+                            <h3 className="text-xs font-black text-gt-text truncate">{char.name}</h3>
+                            <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${prog.owned ? 'bg-gt-gold/20 text-gt-gold border border-gt-gold/40' : 'bg-gt-raised text-gt-subtext'}`}>
+                              {prog.owned ? `C${prog.constellation}` : 'Unowned'}
+                            </span>
+                          </div>
+                          
+                          <div className="text-[10px] font-bold text-gt-subtext capitalize mt-0.5">
+                            {char.element} • {char.weapon}
+                          </div>
+
+                          {prog.owned && (
+                            <div className="mt-1.5 flex items-center gap-1">
+                              <span className="text-[10px] font-black px-1.5 py-0.2 bg-gt-raised border border-gt-border rounded text-gt-gold">
+                                Lvl {prog.level}
+                              </span>
+                              <span className="text-[9px] text-gt-subtext font-semibold">
+                                T: {prog.talents?.normal || 1}/{prog.talents?.skill || 1}/{prog.talents?.burst || 1}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Equipped Weapon Info */}
+                      {prog.owned && (
+                        <div className="mt-3 p-2 bg-gt-raised/80 rounded-xl border border-gt-border/50 text-[10px]">
+                          <div className="flex justify-between items-center text-gt-subtext">
+                            <span className="font-bold text-gt-text truncate">{equippedWeapon?.name || 'No Weapon'}</span>
+                            <span className="text-gt-warmGold font-extrabold ml-1">R{prog.refinement || 1}</span>
+                          </div>
+                          <div className="text-[9px] text-gt-subtext mt-0.5">
+                            Weapon Lvl {prog.weaponLevel || 1} / 90
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quick Action Button */}
+                    <button 
+                      onClick={() => setEditingChar(char)}
+                      className="mt-3 w-full py-1.5 bg-gt-raised hover:bg-gt-gold hover:text-black border border-gt-border text-gt-gold font-extrabold text-xs rounded-xl transition flex items-center justify-center gap-1"
+                    >
+                      <span>⚙️</span> {prog.owned ? 'Edit Build & Stats' : 'Mark Owned / Build'}
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Character Build & Stats Modal */}
+          {editingChar && (
+            <CharacterDetailModal 
+              character={editingChar}
+              progression={getProgression(editingChar.id)}
+              onClose={() => setEditingChar(null)}
+              onSave={(updatedProg) => {
+                mutateState(p => ({
+                  ...p,
+                  characterProgress: {
+                    ...(p.characterProgress || {}),
+                    [editingChar.id]: updatedProg
+                  }
+                }), `Updated ${editingChar.name} build!`);
+                setEditingChar(null);
+              }}
+            />
+          )}
+        </div>
+      );
+    }
+
+    // --- CHARACTER DETAIL & BUILD MODAL COMPONENT ---
+    function CharacterDetailModal({ character, progression, onClose, onSave }) {
+      const [owned, setOwned] = useState(progression.owned);
+      const [level, setLevel] = useState(progression.level || 1);
+      const [constellation, setConstellation] = useState(progression.constellation || 0);
+      const [weaponId, setWeaponId] = useState(progression.weaponId || '');
+      const [weaponLevel, setWeaponLevel] = useState(progression.weaponLevel || 1);
+      const [refinement, setRefinement] = useState(progression.refinement || 1);
+      const [talents, setTalents] = useState(progression.talents || { normal: 1, skill: 1, burst: 1 });
+      const [notes, setNotes] = useState(progression.notes || '');
+
+      // Compatible weapons filtered by character weapon type
+      const compatibleWeapons = useMemo(() => {
+        return WEAPON_DATABASE.filter(w => w.type.toLowerCase() === character.weapon.toLowerCase());
+      }, [character]);
+
+      useEffect(() => {
+        if (!weaponId && compatibleWeapons.length > 0) {
+          setWeaponId(compatibleWeapons[0].id);
+        }
+      }, [weaponId, compatibleWeapons]);
+
+      const handleSave = (e) => {
+        e.preventDefault();
+        onSave({
+          owned,
+          level: parseInt(level) || 1,
+          constellation: parseInt(constellation) || 0,
+          weaponId,
+          weaponLevel: parseInt(weaponLevel) || 1,
+          refinement: parseInt(refinement) || 1,
+          talents: {
+            normal: Math.max(1, Math.min(13, parseInt(talents.normal) || 1)),
+            skill: Math.max(1, Math.min(13, parseInt(talents.skill) || 1)),
+            burst: Math.max(1, Math.min(13, parseInt(talents.burst) || 1))
+          },
+          notes
+        });
+      };
+
+      return (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-gt-card border border-gt-border rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 my-8">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center border-b border-gt-border pb-3">
+              <div className="flex items-center gap-3">
+                <CharacterIcon character={character} className="w-12 h-12" />
+                <div>
+                  <h3 className="text-lg font-black text-gt-gold">{character.name}</h3>
+                  <p className="text-xs text-gt-subtext capitalize">{character.rarity}★ {character.element} • {character.weapon} ({character.region})</p>
+                </div>
+              </div>
+              <button onClick={onClose} className="text-gt-subtext hover:text-gt-text text-lg">✕</button>
+            </div>
+
+            <form onSubmit={handleSave} className="space-y-4 text-xs font-bold">
+              {/* Ownership Switch */}
+              <div className="flex items-center justify-between bg-gt-raised p-3 rounded-2xl border border-gt-border">
+                <div>
+                  <div className="text-xs font-bold text-gt-text">Ownership Status</div>
+                  <div className="text-[10px] text-gt-subtext">Toggle whether this character is unlocked on your account</div>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => setOwned(!owned)}
+                  className={`px-4 py-2 rounded-xl font-extrabold border transition ${owned ? 'bg-gt-gold text-black border-gt-gold' : 'bg-gt-card text-gt-subtext border-gt-border'}`}
+                >
+                  {owned ? '✅ Owned' : '❌ Unowned'}
+                </button>
+              </div>
+
+              {owned && (
+                <>
+                  {/* Character Level & Presets */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-gt-subtext">Character Level</label>
+                      <span className="text-gt-gold font-extrabold text-sm">Lvl {level} / 90</span>
+                    </div>
+                    <input 
+                      type="range"
+                      min="1"
+                      max="90"
+                      value={level}
+                      onChange={e => setLevel(parseInt(e.target.value))}
+                      className="w-full accent-gt-gold"
+                    />
+                    <div className="flex gap-1.5 pt-1">
+                      {[20, 50, 70, 80, 90].map(lvl => (
+                        <button 
+                          type="button"
+                          key={lvl}
+                          onClick={() => setLevel(lvl)}
+                          className={`flex-1 py-1 rounded-lg border text-[10px] font-bold transition ${level === lvl ? 'bg-gt-gold text-black border-gt-gold' : 'bg-gt-raised border-gt-border text-gt-subtext'}`}
+                        >
+                          Lvl {lvl}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Constellations */}
+                  <div className="space-y-1.5">
+                    <label className="text-gt-subtext block">Constellation Level</label>
+                    <div className="grid grid-cols-7 gap-1">
+                      {[0, 1, 2, 3, 4, 5, 6].map(c => (
+                        <button 
+                          type="button"
+                          key={c}
+                          onClick={() => setConstellation(c)}
+                          className={`py-2 rounded-xl border text-center font-extrabold transition ${constellation === c ? 'bg-gt-gold text-black border-gt-gold shadow-md' : 'bg-gt-raised border-gt-border text-gt-subtext'}`}
+                        >
+                          C{c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Equipped Weapon Section */}
+                  <div className="bg-gt-raised p-3 rounded-2xl border border-gt-border space-y-3">
+                    <div className="text-xs font-extrabold text-gt-warmGold uppercase tracking-wider">Equipped Weapon</div>
+                    
+                    <div>
+                      <label className="text-gt-subtext block mb-1">Select {character.weapon}</label>
+                      <select 
+                        value={weaponId}
+                        onChange={e => setWeaponId(e.target.value)}
+                        className="w-full bg-gt-card border border-gt-border rounded-xl p-2.5 text-gt-text font-bold focus:outline-none"
+                      >
+                        {compatibleWeapons.map(w => (
+                          <option key={w.id} value={w.id}>{w.rarity}★ {w.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-gt-subtext block mb-1">Weapon Level</label>
+                        <input 
+                          type="number"
+                          min="1"
+                          max="90"
+                          value={weaponLevel}
+                          onChange={e => setWeaponLevel(parseInt(e.target.value) || 1)}
+                          className="w-full bg-gt-card border border-gt-border rounded-xl p-2 text-center text-gt-gold font-bold focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-gt-subtext block mb-1">Refinement</label>
+                        <select 
+                          value={refinement}
+                          onChange={e => setRefinement(parseInt(e.target.value))}
+                          className="w-full bg-gt-card border border-gt-border rounded-xl p-2 text-center text-gt-warmGold font-bold focus:outline-none"
+                        >
+                          {[1, 2, 3, 4, 5].map(r => (
+                            <option key={r} value={r}>R{r}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Talent Levels */}
+                  <div className="space-y-2">
+                    <label className="text-gt-subtext block">Talent Levels (Normal / Skill / Burst)</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-gt-raised p-2 rounded-xl border border-gt-border text-center space-y-1">
+                        <span className="text-[10px] text-gt-subtext block">Normal Attack</span>
+                        <input 
+                          type="number" 
+                          min="1" 
+                          max="13" 
+                          value={talents.normal} 
+                          onChange={e => setTalents({ ...talents, normal: parseInt(e.target.value) || 1 })}
+                          className="w-full bg-gt-card border border-gt-border rounded-lg p-1 text-center font-black text-gt-text"
+                        />
+                      </div>
+
+                      <div className="bg-gt-raised p-2 rounded-xl border border-gt-border text-center space-y-1">
+                        <span className="text-[10px] text-gt-subtext block">Elemental Skill</span>
+                        <input 
+                          type="number" 
+                          min="1" 
+                          max="13" 
+                          value={talents.skill} 
+                          onChange={e => setTalents({ ...talents, skill: parseInt(e.target.value) || 1 })}
+                          className="w-full bg-gt-card border border-gt-border rounded-lg p-1 text-center font-black text-gt-text"
+                        />
+                      </div>
+
+                      <div className="bg-gt-raised p-2 rounded-xl border border-gt-border text-center space-y-1">
+                        <span className="text-[10px] text-gt-subtext block">Elemental Burst</span>
+                        <input 
+                          type="number" 
+                          min="1" 
+                          max="13" 
+                          value={talents.burst} 
+                          onChange={e => setTalents({ ...talents, burst: parseInt(e.target.value) || 1 })}
+                          className="w-full bg-gt-card border border-gt-border rounded-lg p-1 text-center font-black text-gt-text"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notes & Artifact Goals */}
+                  <div>
+                    <label className="text-gt-subtext block mb-1">Build Notes & Target Artifacts</label>
+                    <textarea 
+                      value={notes}
+                      onChange={e => setNotes(e.target.value)}
+                      placeholder="e.g., 4pc Emblem of Severed Fate, ER / Hydro / CRIT..."
+                      rows="2"
+                      className="w-full bg-gt-raised border border-gt-border rounded-xl p-2.5 text-gt-text font-bold focus:outline-none"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-2 border-t border-gt-border">
+                <button 
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 py-3 bg-gt-raised border border-gt-border rounded-xl text-gt-subtext font-bold"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 py-3 bg-gradient-to-r from-gt-gold to-gt-warmGold text-black font-black rounded-xl hover:opacity-90 transition shadow-lg"
+                >
+                  Save Character Build
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    function ConfirmModal({ confirmModal, setConfirmModal }) {
+      if (!confirmModal) return null;
+      return (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-gt-card border border-gt-border rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-center">
+            <div className="text-3xl">⚠️</div>
+            <h3 className="text-base font-black text-gt-gold">{confirmModal.title}</h3>
+            <p className="text-xs text-gt-subtext">{confirmModal.message}</p>
+
+            <div className="flex gap-2 pt-2">
+              <button 
+                onClick={() => setConfirmModal(null)} 
+                className="flex-1 py-2.5 bg-gt-raised border border-gt-border rounded-xl text-xs font-bold text-gt-subtext"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmModal.onConfirm} 
+                className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-xs font-extrabold hover:bg-red-600 transition"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- ERROR BOUNDARY CLASS ---
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false };
+      }
+      static getDerivedStateFromError() {
+        return { hasError: true };
+      }
+      componentDidCatch(error, info) {
+        console.error("Uncaught Error in Genshin Track:", error, info);
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="min-h-screen bg-[#0A0F23] text-[#E9EDFF] flex flex-col items-center justify-center p-6 text-center space-y-4">
+              <div className="text-5xl">✦</div>
+              <h1 className="text-2xl font-bold text-[#F0C36A]">Something went wrong</h1>
+              <p className="text-sm text-[#AEB7DC] max-w-md">An error occurred while loading this view. Click below to reset state and reload cleanly.</p>
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('genshin_track_v3_clean');
+                  window.location.reload();
+                }}
+                className="px-6 py-3 bg-[#F0C36A] text-black font-extrabold rounded-2xl text-xs hover:opacity-90 transition shadow-lg"
+              >
+                🔄 Clear Cache & Reload
+              </button>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    // --- MAIN APPLICATION COMPONENT ---
+    function App() {
+      const [appData, setAppData] = useState(() => {
+        try {
+          const saved = localStorage.getItem('genshin_track_v3_clean');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            return {
+              ...INITIAL_STATE,
+              ...parsed,
+              settings: { ...INITIAL_STATE.settings, ...(parsed.settings || {}) },
+              pity: { ...INITIAL_STATE.pity, ...(parsed.pity || {}) },
+              savings: { ...INITIAL_STATE.savings, ...(parsed.savings || {}) },
+              resin: { ...INITIAL_STATE.resin, ...(parsed.resin || {}) },
+              inventory: { ...INITIAL_STATE.inventory, ...(parsed.inventory || {}) }
+            };
+          }
+        } catch (e) {
+          console.error("Failed to load saved state", e);
+        }
+        return INITIAL_STATE;
+      });
+
+      const [activeTab, setActiveTab] = useState('pity');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [isSearchOpen, setIsSearchOpen] = useState(false);
+      const [logModalBanner, setLogModalBanner] = useState(null);
+      const [confirmModal, setConfirmModal] = useState(null);
+      const [toastMessage, setToastMessage] = useState(null);
+      const [lastStateHistory, setLastStateHistory] = useState([]);
+
+      useEffect(() => {
+        try {
+          localStorage.setItem('genshin_track_v3_clean', JSON.stringify(appData));
+        } catch (e) {
+          console.error("Failed to save data", e);
+        }
+      }, [appData]);
+
+      useEffect(() => {
+        const interval = setInterval(() => {
+          setAppData(prev => {
+            const now = Date.now();
+            const elapsedMs = now - (prev.resin.lastUpdated || now);
+            const resinToAdd = Math.floor(elapsedMs / (8 * 60 * 1000));
+            if (resinToAdd > 0 && prev.resin.current < prev.resin.max) {
+              const newResin = Math.min(prev.resin.max, prev.resin.current + resinToAdd);
+              return {
+                ...prev,
+                resin: {
+                  ...prev.resin,
+                  current: newResin,
+                  lastUpdated: now
+                }
+              };
+            }
+            return prev;
+          });
+        }, 15000);
+        return () => clearInterval(interval);
+      }, []);
+
+      const showToast = useCallback((msg) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(null), 3000);
+      }, []);
+
+      const mutateState = useCallback((updater, toastText) => {
+        setAppData(prev => {
+          setLastStateHistory(h => [JSON.parse(JSON.stringify(prev)), ...h.slice(0, 5)]);
+          const next = updater(prev);
+          return next;
+        });
+        if (toastText) showToast(toastText);
+      }, [showToast]);
+
+      const handleUndo = useCallback(() => {
+        if (lastStateHistory.length === 0) return;
+        const previous = lastStateHistory[0];
+        setAppData(previous);
+        setLastStateHistory(h => h.slice(1));
+        showToast("Action Undone!");
+      }, [lastStateHistory, showToast]);
+
+      const totalPrimogemsSpent = useMemo(() => {
+        let count = 0;
+        Object.values(appData.pity).forEach(b => {
+          count += (b.totalWishes || 0) * 160;
+        });
+        return count;
+      }, [appData.pity]);
+
+      const totalWishesSpent = useMemo(() => {
+        return Math.floor(totalPrimogemsSpent / 160);
+      }, [totalPrimogemsSpent]);
+
+      return (
+        <ErrorBoundary>
+          <div className="min-h-screen flex flex-col pb-20 md:pb-6">
+            <header className="sticky top-0 z-40 bg-gt-bg/90 backdrop-blur-md border-b border-gt-border py-3 px-4 sm:px-8">
+              <div className="max-w-6xl mx-auto flex justify-between items-center">
+                <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('home')}>
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-gt-gold to-gt-warmGold flex items-center justify-center text-black font-black text-xl shadow-lg glow-gold">
+                    ✦
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-black font-genshin text-gradient-gold tracking-wide leading-none">Genshin Track</h1>
+                    <span className="text-[10px] font-bold text-gt-subtext tracking-widest uppercase">Genshin Impact Companion</span>
+                  </div>
+                </div>
+
+                <nav className="hidden md:flex items-center gap-1 bg-gt-sec p-1 rounded-2xl border border-gt-border">
+                  {[
+                    { id: 'home', label: 'Home' },
+                    { id: 'pity', label: 'Pity' },
+                    { id: 'history', label: 'History' },
+                    { id: 'planner', label: 'Planner' },
+                    { id: 'materials', label: 'Materials' },
+                    { id: 'todo', label: 'To-do' },
+                    { id: 'characters', label: 'Characters' },
+                    { id: 'wishlist', label: 'Wishlist' }
+                  ].map(t => (
+                    <button 
+                      key={t.id}
+                      onClick={() => setActiveTab(t.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition ${activeTab === t.id ? 'bg-gt-gold text-black shadow-md' : 'text-gt-subtext hover:text-gt-text'}`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </nav>
+
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setIsSearchOpen(true)}
+                    className="p-2 bg-gt-card border border-gt-border hover:border-gt-gold rounded-xl text-gt-subtext hover:text-gt-text text-xs font-bold transition"
+                    title="Universal Search"
+                  >
+                    🔍
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('settings')}
+                    className="p-2 bg-gt-card border border-gt-border hover:border-gt-gold rounded-xl text-gt-subtext hover:text-gt-text text-xs font-bold transition"
+                    title="Settings"
+                  >
+                    ⚙️
+                  </button>
+                </div>
+              </div>
+            </header>
+
+            <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6">
+              {activeTab === 'home' && <HomeTab appData={appData} mutateState={mutateState} setActiveTab={setActiveTab} />}
+              {activeTab === 'pity' && <PityTab appData={appData} mutateState={mutateState} setConfirmModal={setConfirmModal} setLogModalBanner={setLogModalBanner} handleUndo={handleUndo} lastStateHistory={lastStateHistory} totalPrimogemsSpent={totalPrimogemsSpent} totalWishesSpent={totalWishesSpent} />}
+              {activeTab === 'history' && <HistoryTab appData={appData} mutateState={mutateState} showToast={showToast} setLogModalBanner={setLogModalBanner} />}
+              {activeTab === 'planner' && <PlannerTab appData={appData} mutateState={mutateState} />}
+              {activeTab === 'materials' && <MaterialsTab appData={appData} mutateState={mutateState} />}
+              {activeTab === 'todo' && <TodoTab appData={appData} mutateState={mutateState} />}
+              {activeTab === 'characters' && <CharactersTab appData={appData} mutateState={mutateState} />}
+              {activeTab === 'wishlist' && <WishlistTab appData={appData} mutateState={mutateState} />}
+              {activeTab === 'settings' && <SettingsTab appData={appData} mutateState={mutateState} showToast={showToast} setConfirmModal={setConfirmModal} />}
+            </main>
+
+            <nav className="md:hidden fixed bottom-0 inset-x-0 bg-gt-sec/95 backdrop-blur-md border-t border-gt-border p-2 z-40 flex justify-around items-center">
+              {[
+                { id: 'pity', label: 'Pity', icon: '✨' },
+                { id: 'home', label: 'Home', icon: '🏠' },
+                { id: 'planner', label: 'Planner', icon: '💎' },
+                { id: 'materials', label: 'Materials', icon: '🌙' },
+                { id: 'todo', label: 'To-do', icon: '📋' },
+                { id: 'history', label: 'History', icon: '📜' }
+              ].map(m => (
+                <button 
+                  key={m.id}
+                  onClick={() => setActiveTab(m.id)}
+                  className={`flex flex-col items-center gap-0.5 p-1 rounded-xl transition ${activeTab === m.id ? 'text-gt-gold' : 'text-gt-subtext'}`}
+                >
+                  <span className="text-base">{m.icon}</span>
+                  <span className="text-[10px] font-bold">{m.label}</span>
+                </button>
+              ))}
+            </nav>
+
+            {toastMessage && (
+              <div className="fixed bottom-16 md:bottom-6 right-6 bg-gt-gold text-black font-black text-xs px-4 py-2.5 rounded-2xl shadow-2xl z-50 animate-bounceSlow">
+                ✦ {toastMessage}
+              </div>
+            )}
+
+            <SearchModal 
+              isSearchOpen={isSearchOpen} 
+              setIsSearchOpen={setIsSearchOpen} 
+              searchQuery={searchQuery} 
+              setSearchQuery={setSearchQuery} 
+              appData={appData} 
+              setActiveTab={setActiveTab} 
+            />
+            <LogModal 
+              logModalBanner={logModalBanner} 
+              setLogModalBanner={setLogModalBanner} 
+              appData={appData} 
+              mutateState={mutateState} 
+            />
+            <ConfirmModal 
+              confirmModal={confirmModal} 
+              setConfirmModal={setConfirmModal} 
+            />
+          </div>
+        </ErrorBoundary>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
