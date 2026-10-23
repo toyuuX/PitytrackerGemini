@@ -1,0 +1,16 @@
+{
+"name": "Genshin Pitytracker",
+"short_name": "Pitytracker",
+"description": "A beautiful tracker for your Genshin Impact wishes.",
+"start_url": "./index.html",
+"display": "standalone",
+"background_color": "#0f1016",
+"theme_color": "#1a1c29",
+"icons": [
+{
+"src": "icon.svg",
+"sizes": "any",
+"type": "image/svg+xml"
+}
+]
+}
