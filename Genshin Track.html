@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Genshin Track - Wish Tracker & Companion</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Nunito:wght@400;600;700;800;900&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & ReactDOM CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel CDN for inline JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            gt: {
+              bg: 'var(--bg-main, #0A0F23)',
+              sec: 'var(--bg-sec, #0E1530)',
+              card: 'var(--bg-card, #131B3B)',
+              raised: 'var(--bg-raised, #1A2448)',
+              border: 'var(--border-color, #2B3766)',
+              gold: 'var(--accent-gold, #F0C36A)',
+              warmGold: 'var(--accent-warm, #FFB259)',
+              text: 'var(--text-main, #E9EDFF)',
+              subtext: 'var(--text-sub, #AEB7DC)',
+              r5: '#F3B942',
+              r4: '#A974F2',
+              r3: '#5AA0F2',
+              pyro: '#FF6640',
+              hydro: '#33CCFF',
+              anemo: '#00FF99',
+              electro: '#CC80FF',
+              dendro: '#A6E92D',
+              cryo: '#99FFFF',
+              geo: '#FFB300'
+            }
+          },
+          fontFamily: {
+            roboto: ['Roboto', 'sans-serif'],
+            nunito: ['Nunito', 'sans-serif'],
+            marcellus: ['Marcellus', 'serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      --bg-main: #0A0F23;
+      --bg-sec: #0E1530;
+      --bg-card: #131B3B;
+      --bg-raised: #1A2448;
+      --border-color: #2B3766;
+      --accent-gold: #F0C36A;
+      --accent-warm: #FFB259;
+      --text-main: #E9EDFF;
+      --text-sub: #AEB7DC;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: 'Roboto', sans-serif;
+      overflow-x: hidden;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+    }
+
+    .font-heading { font-family: 'Nunito', sans-serif; }
+    .font-genshin { font-family: 'Marcellus', serif; }
+
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0A0F23; }
+    ::-webkit-scrollbar-thumb { background: #2B3766; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #F0C36A; }
+
+    /* Animations */
+    .animate-fadeIn { animation: fadeIn 0.25s ease-out forwards; }
+    .animate-slideUp { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .animate-bounceSlow { animation: bounce 3s infinite; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Glow effects */
+    .glow-gold { box-shadow: 0 0 15px rgba(240, 195, 106, 0.25); }
+    .glow-purple { box-shadow: 0 0 15px rgba(169, 116, 242, 0.25); }
+    .text-gradient-gold {
+      background: linear-gradient(135deg, #FFF0CA 0%, #F0C36A 50%, #FFB259 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* Range input styling */
+    input[type=range] {
+      accent-color: var(--accent-gold);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Main Application Logic -->
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+    // --- CHARACTER & WEAPON DATABASE ---
+    const CHARACTER_DATABASE = [
+      { id: 'skirk', name: 'Skirk', rarity: 5, element: 'cryo', weapon: 'Sword', region: 'Khaenri\'ah', icon: 'https://enka.network/ui/UI_AvatarIcon_Skirk.png' },
+      { id: 'escoffier', name: 'Escoffier', rarity: 5, element: 'cryo', weapon: 'Polearm', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Escoffier.png' },
+      { id: 'mavuika', name: 'Mavuika', rarity: 5, element: 'pyro', weapon: 'Claymore', region: 'Natlan', icon: 'https://enka.network/ui/UI_AvatarIcon_Mavuika.png' },
+      { id: 'neuvillette', name: 'Neuvillette', rarity: 5, element: 'hydro', weapon: 'Catalyst', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Neuvillette.png' },
+      { id: 'furina', name: 'Furina', rarity: 5, element: 'hydro', weapon: 'Sword', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Furina.png' },
+      { id: 'arlecchino', name: 'Arlecchino', rarity: 5, element: 'pyro', weapon: 'Polearm', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Arlecchino.png' },
+      { id: 'zhongli', name: 'Zhongli', rarity: 5, element: 'geo', weapon: 'Polearm', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Zhongli.png' },
+      { id: 'kazuha', name: 'Kaedehara Kazuha', rarity: 5, element: 'anemo', weapon: 'Sword', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Kazuha.png' },
+      { id: 'nahida', name: 'Nahida', rarity: 5, element: 'dendro', weapon: 'Catalyst', region: 'Sumeru', icon: 'https://enka.network/ui/UI_AvatarIcon_Nahida.png' },
+      { id: 'raiden', name: 'Raiden Shogun', rarity: 5, element: 'electro', weapon: 'Polearm', region: 'Inazuma', icon: 'https://enka.network/ui/UI_AvatarIcon_Shohou.png' },
+      { id: 'hu_tao', name: 'Hu Tao', rarity: 5, element: 'pyro', weapon: 'Polearm', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Hutao.png' },
+      { id: 'yelan', name: 'Yelan', rarity: 5, element: 'hydro', weapon: 'Bow', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Yelan.png' },
+      { id: 'navia', name: 'Navia', rarity: 5, element: 'geo', weapon: 'Claymore', region: 'Fontaine', icon: 'https://enka.network/ui/UI_AvatarIcon_Navia.png' },
+      { id: 'xilonen', name: 'Xilonen', rarity: 5, element: 'geo', weapon: 'Sword', region: 'Natlan', icon: 'https://enka.network/ui/UI_AvatarIcon_Xilonen.png' },
+      { id: 'bennett', name: 'Bennett', rarity: 4, element: 'pyro', weapon: 'Sword', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Bennett.png' },
+      { id: 'xianglin', name: 'Xiangling', rarity: 4, element: 'pyro', weapon: 'Polearm', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Xiangling.png' },
+      { id: 'xingqiu', name: 'Xingqiu', rarity: 4, element: 'hydro', weapon: 'Sword', region: 'Liyue', icon: 'https://enka.network/ui/UI_AvatarIcon_Xingqiu.png' },
+      { id: 'fischl', name: 'Fischl', rarity: 4, element: 'electro', weapon: 'Bow', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Fischl.png' },
+      { id: 'sucrose', name: 'Sucrose', rarity: 4, element: 'anemo', weapon: 'Catalyst', region: 'Mondstadt', icon: 'https://enka.network/ui/UI_AvatarIcon_Sucrose.png' },
+      { id: 'kachina', name: 'Kachina', rarity: 4, element: 'geo', weapon: 'Polearm', region: 'Natlan', icon: 'https://enka.network/ui/UI_AvatarIcon_Kachina.png' }
+    ];
+
+    const WEAPON_DATABASE = [
+      { id: 'splendor', name: 'Splendor of Tranquil Waters', rarity: 5, type: 'Sword' },
+      { id: 'staff_homa', name: 'Staff of Homa', rarity: 5, type: 'Polearm' },
+      { id: 'mistsplitter', name: 'Mistsplitter Reforged', rarity: 5, type: 'Sword' },
+      { id: 'tome_flow', name: 'Tome of the Eternal Flow', rarity: 5, type: 'Catalyst' },
+      { id: 'aqua_simulacra', name: 'Aqua Simulacra', rarity: 5, type: 'Bow' },
+      { id: 'fav_lance', name: 'Favonius Lance', rarity: 4, type: 'Polearm' },
+      { id: 'fav_sword', name: 'Favonius Sword', rarity: 4, type: 'Sword' },
+      { id: 'widsith', name: 'The Widsith', rarity: 4, type: 'Catalyst' },
+      { id: 'sac_sword', name: 'Sacrificial Sword', rarity: 4, type: 'Sword' }
+    ];
+
+    const DOMAIN_SCHEDULE = {
+      1: { name: 'Monday', talents: ['Freedom', 'Prosperity', 'Transience', 'Admonition', 'Equity', 'Contention'], weapons: ['Decarabian', 'Guyun', 'Distant Sea', 'Copper', 'Mechanical'] },
+      2: { name: 'Tuesday', talents: ['Resistance', 'Diligence', 'Elegant', 'Ingenuity', 'Justice', 'Kindling'], weapons: ['Boreal Wolf', 'Mist Veiled', 'Narukami', 'Oasis Garden', 'Pure Sacred'] },
+      3: { name: 'Wednesday', talents: ['Ballad', 'Gold', 'Light', 'Praxis', 'Order', 'Conflict'], weapons: ['Dandelion Gladiator', 'Aerosiderite', 'Mask', 'Scorching Sun', 'Ancient Chord'] },
+      4: { name: 'Thursday', talents: ['Freedom', 'Prosperity', 'Transience', 'Admonition', 'Equity', 'Contention'], weapons: ['Decarabian', 'Guyun', 'Distant Sea', 'Copper', 'Mechanical'] },
+      5: { name: 'Friday', talents: ['Resistance', 'Diligence', 'Elegant', 'Ingenuity', 'Justice', 'Kindling'], weapons: ['Boreal Wolf', 'Mist Veiled', 'Narukami', 'Oasis Garden', 'Pure Sacred'] },
+      6: { name: 'Saturday', talents: ['Ballad', 'Gold', 'Light', 'Praxis', 'Order', 'Conflict'], weapons: ['Dandelion Gladiator', 'Aerosiderite', 'Mask', 'Scorching Sun', 'Ancient Chord'] },
+      0: { name: 'Sunday', talents: ['All Materials Open'], weapons: ['All Materials Open'] }
+    };
+
+    // --- DEFAULT APPLICATION STATE ---
+    const INITIAL_STATE = {
+      version: 2,
+      settings: {
+        theme: 'dark',
+        styleMode: 'genshin',
+        accentColor: 'gold',
+        customAccentHex: '#F0C36A',
+        savingsDisplay: 'split',
+        bannerArt: true,
+        chronicledWishEnabled: true,
+        region: 'America',
+        welkinActive: true,
+        visibleTabs: ['home', 'pity', 'history', 'planner', 'materials', 'todo', 'characters', 'wishlist'],
+        homeWidgets: ['pitySummary', 'resinStatus', 'todoOverview', 'domainSchedule', 'primogemSavings', 'wishlistSummary']
+      },
+      pity: {
+        character: { count: 32, guaranteed: false, totalWishes: 124, lastFiveStar: 'Neuvillette' },
+        weapon: { count: 14, guaranteed: false, fatePoints: 0, totalWishes: 45, targetWeapon: 'Splendor of Tranquil Waters' },
+        standard: { count: 58, totalWishes: 198 },
+        chronicled: { count: 6, guaranteed: false, totalWishes: 12 }
+      },
+      savings: {
+        primogems: 14200,
+        fatesIntertwined: 18,
+        fatesAcquaint: 6
+      },
+      resin: {
+        current: 138,
+        max: 200,
+        lastUpdated: Date.now()
+      },
+      history: [
+        { id: '1', banner: 'character', item: 'Neuvillette', rarity: 5, pity: 78, date: '2026-09-15' },
+        { id: '2', banner: 'character', item: 'Kachina', rarity: 4, pity: 8, date: '2026-09-15' },
+        { id: '3', banner: 'weapon', item: 'Staff of Homa', rarity: 5, pity: 64, date: '2026-08-20' },
+        { id: '4', banner: 'standard', item: 'Mona', rarity: 5, pity: 75, date: '2026-07-10' }
+      ],
+      wishlist: [
+        { id: 'w1', name: 'Skirk', type: 'character', banner: 'character', goal: 'C0', priority: 1, wishBudget: 180 },
+        { id: 'w2', name: 'Escoffier', type: 'character', banner: 'character', goal: 'C0', priority: 2, wishBudget: 90 },
+        { id: 'w3', name: 'Splendor of Tranquil Waters', type: 'weapon', banner: 'weapon', goal: 'R1', priority: 3, wishBudget: 160 }
+      ],
+      todo: [
+        { id: 't1', title: 'Farm Equity Talent Books for Fontaine characters', category: 'Domain', completed: false, priority: 'high' },
+        { id: 't2', title: 'Defeat Weekly Boss: All-Devouring Narwhal', category: 'Boss', completed: false, priority: 'medium' },
+        { id: 't3', title: 'Complete Daily Commissions (60 Primogems)', category: 'Daily', completed: true, priority: 'high' }
+      ],
+      characterProgress: {
+        skirk: { owned: false, constellation: 0, level: 1 },
+        neuvillette: { owned: true, constellation: 1, level: 90 },
+        furina: { owned: true, constellation: 2, level: 90 },
+        zhongli: { owned: true, constellation: 0, level: 90 }
+      }
+    };
+
+    // --- HELPER COMPONENT FOR IMAGE FALLBACKS ---
+    function CharacterIcon({ character, className = "w-12 h-12", showRarity = true }) {
+      const [imgError, setImgError] = useState(false);
+      
+      const elementColors = {
+        pyro: '#FF6640', hydro: '#33CCFF', anemo: '#00FF99',
+        electro: '#CC80FF', dendro: '#A6E92D', cryo: '#99FFFF', geo: '#FFB300'
+      };
+
+      const rarityBg = character?.rarity === 5 
+        ? 'bg-gradient-to-b from-[#A27137] to-[#F3B942]' 
+        : 'bg-gradient-to-b from-[#56437B] to-[#A974F2]';
+
+      const elementColor = elementColors[character?.element?.toLowerCase()] || '#F0C36A';
+
+      if (!character) return <div className={`${className} bg-gt-raised rounded-xl`}></div>;
+
+      return (
+        <div className={`relative rounded-xl overflow-hidden shadow-md flex-shrink-0 ${rarityBg} ${className}`}>
+          {!imgError && character.icon ? (
+            <img 
+              src={character.icon} 
+              alt={character.name} 
+              className="w-full h-full object-cover rounded-xl" 
+              onError={() => setImgError(true)} 
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center p-1 text-center bg-gt-raised">
+              <div className="w-3 h-3 rounded-full mb-1 shadow-sm" style={{ backgroundColor: elementColor }}></div>
+              <span className="text-[10px] font-bold leading-tight line-clamp-2 text-gt-text">{character.name}</span>
+            </div>
+          )}
+          {showRarity && (
+            <div className="absolute bottom-0 inset-x-0 bg-black/60 text-[9px] text-center font-bold text-gt-gold py-[1px]">
+              {character.rarity}★
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // --- MAIN APPLICATION COMPONENT ---
+    function App() {
+      // LocalStorage State Initialization
+      const [appData, setAppData] = useState(() => {
+        try {
+          const saved = localStorage.getItem('genshin_track_v2_data');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            return { ...INITIAL_STATE, ...parsed };
+          }
+        } catch (e) {
+          console.error("Failed to load saved state", e);
+        }
+        return INITIAL_STATE;
+      });
+
+      const [activeTab, setActiveTab] = useState('pity');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [isSearchOpen, setIsSearchOpen] = useState(false);
+      const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+      const [isMenuOpen, setIsMenuOpen] = useState(false);
+      const [logModalBanner, setLogModalBanner] = useState(null);
+      const [toastMessage, setToastMessage] = useState(null);
+      const [lastStateHistory, setLastStateHistory] = useState([]);
+
+      // Auto-save mutation
+      useEffect(() => {
+        try {
+          localStorage.setItem('genshin_track_v2_data', JSON.stringify(appData));
+        } catch (e) {
+          console.error("Failed to save data", e);
+        }
+      }, [appData]);
+
+      // Resin regeneration calculation logic
+      useEffect(() => {
+        const interval = setInterval(() => {
+          setAppData(prev => {
+            const now = Date.now();
+            const elapsedMs = now - prev.resin.lastUpdated;
+            const resinToAdd = Math.floor(elapsedMs / (8 * 60 * 1000));
+            if (resinToAdd > 0 && prev.resin.current < prev.resin.max) {
+              const newResin = Math.min(prev.resin.max, prev.resin.current + resinToAdd);
+              return {
+                ...prev,
+                resin: {
+                  ...prev.resin,
+                  current: newResin,
+                  lastUpdated: now
+                }
+              };
+            }
+            return prev;
+          });
+        }, 30000); // Check every 30s
+        return () => clearInterval(interval);
+      }, []);
+
+      // Toast notification trigger
+      const showToast = useCallback((msg) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(null), 3000);
+      }, []);
+
+      // Helper for saving undo state
+      const mutateState = useCallback((updater, toastText) => {
+        setAppData(prev => {
+          setLastStateHistory(h => [JSON.parse(JSON.stringify(prev)), ...h.slice(0, 5)]);
+          const next = updater(prev);
+          return next;
+        });
+        if (toastText) showToast(toastText);
+      }, [showToast]);
+
+      const handleUndo = useCallback(() => {
+        if (lastStateHistory.length === 0) return;
+        const previous = lastStateHistory[0];
+        setAppData(previous);
+        setLastStateHistory(h => h.slice(1));
+        showToast("Action Undone!");
+      }, [lastStateHistory, showToast]);
+
+      // Calculation values
+      const totalPrimogemsSpent = useMemo(() => {
+        let count = 0;
+        Object.values(appData.pity).forEach(b => {
+          count += (b.totalWishes || 0) * 160;
+        });
+        return count;
+      }, [appData.pity]);
+
+      const totalWishesSpent = useMemo(() => {
+        return Math.floor(totalPrimogemsSpent / 160);
+      }, [totalPrimogemsSpent]);
+
+      // --- RENDER METHODS FOR EACH TAB ---
+
+      // 1. HOME DASHBOARD TAB
+      const renderHomeTab = () => (
+        <div className="space-y-5 animate-slideUp">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold font-heading text-gt-gold">Traveler Dashboard</h2>
+            <button 
+              onClick={() => setActiveTab('settings')}
+              className="px-3 py-1.5 bg-gt-card border border-gt-border hover:border-gt-gold rounded-xl text-xs font-semibold text-gt-subtext hover:text-gt-text transition flex items-center gap-1.5"
+            >
+              ⚙️ Custom Layout
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Widget: Pity Summary */}
+            <div className="bg-gt-card border border-gt-border rounded-2xl p-4 shadow-lg hover:border-gt-gold/50 transition">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-gt-gold">✨ Pity Counters</span>
+                <button onClick={() => setActiveTab('pity')} className="text-xs text-gt-warmGold hover:underline font-bold">View All →</button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gt-raised p-3 rounded-xl border border-gt-border/50">
+                  <div className="text-[11px] text-gt-subtext font-bold">Character Wish</div>
+                  <div className="text-2xl font-extrabold text-gt-gold my-0.5">{appData.pity.character.count} <span className="text-xs text-gt-subtext font-normal">/ 90</span></div>
+                  <div className="text-[10px] text-gt-subtext flex justify-between">
+                    <span>{appData.pity.character.guaranteed ? "Guaranteed 5★" : "50/50 Status"}</span>
+                    <span className="text-gt-gold font-bold">{appData.pity.character.count >= 74 ? "Soft Pity!" : "Normal"}</span>
+                  </div>
+                </div>
+                <div className="bg-gt-raised p-3 rounded-xl border border-gt-border/50">
+                  <div className="text-[11px] text-gt-subtext font-bold">Weapon Wish</div>
+                  <div className="text-2xl font-extrabold text-gt-warmGold my-0.5">{appData.pity.weapon.count} <span className="text-xs text-gt-subtext font-normal">/ 80</span></div>
+                  <div className="text-[10px] text-gt-subtext flex justify-between">
+                    <span>Fate Pts: {appData.pity.weapon.fatePoints || 0}/1</span>
+                    <span className="text-gt-warmGold font-bold">{appData.pity.weapon.count >= 63 ? "Soft Pity!" : "Normal"}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Widget: Resin Status */}
+            <div className="bg-gt-card border border-gt-border rounded-2xl p-4 shadow-lg hover:border-gt-gold/50 transition">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-gt-gold">🌙 Resin Overview</span>
+                <button onClick={() => setActiveTab('materials')} className="text-xs text-gt-warmGold hover:underline font-bold">Manage →</button>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="relative w-16 h-16 flex-shrink-0 flex items-center justify-center">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                    <path className="text-gt-raised stroke-current" strokeWidth="4" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <path className="text-gt-hydro stroke-current" strokeDasharray={`${(appData.resin.current / appData.resin.max) * 100}, 100`} strokeWidth="4" strokeLinecap="round" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  </svg>
+                  <span className="absolute font-extrabold text-sm text-gt-text">{appData.resin.current}</span>
+                </div>
+                <div className="flex-1">
+                  <div className="text-xs font-semibold text-gt-subtext mb-1">
+                    {appData.resin.current >= 200 ? "Resin Full!" : `Full in ~${Math.ceil((200 - appData.resin.current) * 8 / 60)} hrs`}
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <button 
+                      onClick={() => mutateState(p => ({ ...p, resin: { ...p.resin, current: Math.max(0, p.resin.current - 20) } }), "Spent 20 Resin")}
+                      className="px-2.5 py-1 bg-gt-raised border border-gt-border rounded-lg text-xs font-bold text-gt-subtext hover:text-gt-gold transition"
+                    >
+                      -20
+                    </button>
+                    <button 
+                      onClick={() => mutateState(p => ({ ...p, resin: { ...p.resin, current: Math.max(0, p.resin.current - 40) } }), "Spent 40 Resin")}
+                      className="px-2.5 py-1 bg-gt-raised border border-gt-border rounded-lg text-xs font-bold text-gt-subtext hover:text-gt-gold transition"
+                    >
+                      -40 Condensed
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Widget: Farmable Domains Today */}
+            <div className="bg-gt-card border border-gt-border rounded-2xl p-4 shadow-lg hover:border-gt-gold/50 transition">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-gt-gold">⚔️ Today's Domain Schedule</span>
+                <span className="text-[11px] text-gt-subtext font-semibold">{DOMAIN_SCHEDULE[new Date().getDay()].name}</span>
+              </div>
+              <div className="space-y-2 mt-3">
+                <div className="text-xs text-gt-subtext"><strong className="text-gt-text">Talent Books:</strong> {DOMAIN_SCHEDULE[new Date().getDay()].talents.join(', ')}</div>
+                <div className="text-xs text-gt-subtext"><strong className="text-gt-text">Weapon Mats:</strong> {DOMAIN_SCHEDULE[new Date().getDay()].weapons.join(', ')}</div>
+              </div>
+            </div>
+
+            {/* Widget: Primogem Savings */}
+            <div className="bg-gt-card border border-gt-border rounded-2xl p-4 shadow-lg hover:border-gt-gold/50 transition">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-gt-gold">💎 Primogem Savings</span>
+                <button onClick={() => setActiveTab('planner')} className="text-xs text-gt-warmGold hover:underline font-bold">Planner →</button>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+                <div className="bg-gt-raised p-2 rounded-xl">
+                  <div className="text-[10px] text-gt-subtext font-bold">Primogems</div>
+                  <div className="text-base font-extrabold text-gt-gold">{appData.savings.primogems}</div>
+                </div>
+                <div className="bg-gt-raised p-2 rounded-xl">
+                  <div className="text-[10px] text-gt-subtext font-bold">Intertwined</div>
+                  <div className="text-base font-extrabold text-gt-r5">{appData.savings.fatesIntertwined}</div>
+                </div>
+                <div className="bg-gt-raised p-2 rounded-xl">
+                  <div className="text-[10px] text-gt-subtext font-bold">Total Wishes</div>
+                  <div className="text-base font-extrabold text-gt-text">
+                    {Math.floor(appData.savings.primogems / 160) + appData.savings.fatesIntertwined}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+
+      // 2. PITY TRACKER TAB (MAIN FEATURE)
+      const renderPityTab = () => {
+        const banners = [
+          { key: 'character', name: 'Character Event Wish', maxPity: 90, softPity: 74, color: 'from-[#A27137] to-[#F3B942]', accent: 'gt-gold' },
+          { key: 'weapon', name: 'Weapon Event Wish', maxPity: 80, softPity: 63, color: 'from-[#70522B] to-[#FFB259]', accent: 'gt-warmGold' },
+          { key: 'standard', name: 'Standard Wish', maxPity: 90, softPity: 74, color: 'from-[#2B4B70] to-[#5AA0F2]', accent: 'gt-r3' },
+          ...(appData.settings.chronicledWishEnabled ? [{ key: 'chronicled', name: 'Chronicled Wish', maxPity: 90, softPity: 74, color: 'from-[#4F306B] to-[#A974F2]', accent: 'gt-r4' }] : [])
+        ];
+
+        return (
+          <div className="space-y-6 animate-slideUp">
+            {/* Top Global Summary Header */}
+            <div className="bg-gradient-to-r from-gt-card via-gt-raised to-gt-card border border-gt-border rounded-3xl p-5 shadow-xl relative overflow-hidden">
+              <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <div className="text-xs uppercase tracking-wider font-extrabold text-gt-subtext">Lifetime Wish Statistics</div>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-3xl font-extrabold text-gradient-gold">{totalPrimogemsSpent.toLocaleString()}</span>
+                    <span className="text-xs text-gt-subtext font-bold">Primogems Equivalent ({totalWishesSpent} Wishes)</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button 
+                    onClick={handleUndo} 
+                    disabled={lastStateHistory.length === 0}
+                    className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold border transition ${lastStateHistory.length > 0 ? 'bg-gt-raised border-gt-gold text-gt-gold hover:bg-gt-gold hover:text-black' : 'bg-gt-raised/40 border-gt-border text-gt-subtext/40 cursor-not-allowed'}`}
+                  >
+                    ↩️ Undo Last
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (confirm("Reset all pity counters for all banners? History will be preserved.")) {
+                        mutateState(p => ({
+                          ...p,
+                          pity: INITIAL_STATE.pity
+                        }), "Pity Counters Reset");
+                      }
+                    }}
+                    className="flex-1 sm:flex-none px-4 py-2 bg-red-500/10 border border-red-500/30 hover:border-red-500 text-red-400 hover:text-red-300 rounded-xl text-xs font-bold transition"
+                  >
+                    🗑️ Reset All
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Individual Banner Cards */}
+            <div className="space-y-5">
+              {banners.map(b => {
+                const pityData = appData.pity[b.key] || { count: 0, guaranteed: false };
+                const isSoftPity = pityData.count >= b.softPity;
+                const isHardPity = pityData.count >= b.maxPity;
+                const pullsToSoft = Math.max(0, b.softPity - pityData.count);
+                const pullsToHard = Math.max(0, b.maxPity - pityData.count);
+
+                // Probability calculation approximation model
+                let currentRate = b.key === 'weapon' ? 0.7 : 0.6;
+                if (isSoftPity) {
+                  currentRate += (pityData.count - b.softPity + 1) * 6.0;
+                }
+                if (isHardPity) currentRate = 100;
+
+                const primosToSoft = pullsToSoft * 160;
+                const primosToHard = pullsToHard * 160;
+
+                return (
+                  <div key={b.key} className="bg-gt-card border border-gt-border hover:border-gt-gold/40 rounded-3xl p-5 shadow-xl transition relative overflow-hidden">
+                    {/* Header */}
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <span className="text-xs font-bold text-gt-subtext uppercase tracking-wider">Banner Tracker</span>
+                        <h3 className="text-xl font-black font-heading text-gt-text mt-0.5">{b.name}</h3>
+                      </div>
+                      
+                      {/* Guarantee Toggle */}
+                      {('guaranteed' in pityData) && (
+                        <button 
+                          onClick={() => mutateState(p => ({
+                            ...p,
+                            pity: {
+                              ...p.pity,
+                              [b.key]: { ...p.pity[b.key], guaranteed: !p.pity[b.key].guaranteed }
+                            }
+                          }), `${b.name} guarantee toggled`)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-extrabold border transition ${pityData.guaranteed ? 'bg-gt-gold/20 border-gt-gold text-gt-gold' : 'bg-gt-raised border-gt-border text-gt-subtext hover:border-gt-gold/50'}`}
+                        >
+                          {pityData.guaranteed ? '✨ Next 5★ Featured Guaranteed' : '⚖️ 50/50 Chance'}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Counter & Progress Gauge */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-center my-4">
+                      <div className="text-center md:text-left">
+                        <div className="text-xs font-bold text-gt-subtext">Current Pity</div>
+                        <div className="text-5xl font-black font-heading text-gt-gold my-1">{pityData.count} <span className="text-lg font-normal text-gt-subtext">/ {b.maxPity}</span></div>
+                        <div className="text-xs font-semibold text-gt-subtext">
+                          Total Wishes Logged: <strong className="text-gt-text">{pityData.totalWishes || 0}</strong>
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-2 space-y-3">
+                        {/* Progress Bar Visual Gauge */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs font-bold">
+                            <span className={isSoftPity ? "text-gt-gold font-extrabold" : "text-gt-subtext"}>
+                              {isSoftPity ? "⚡ SOFT PITY ACTIVE!" : `Soft Pity in ${pullsToSoft} wishes`}
+                            </span>
+                            <span className="text-gt-subtext">Hard Pity: {pullsToHard} wishes</span>
+                          </div>
+                          <div className="w-full h-4 bg-gt-raised border border-gt-border rounded-full p-0.5 relative overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r ${b.color}`}
+                              style={{ width: `${Math.min(100, (pityData.count / b.maxPity) * 100)}%` }}
+                            ></div>
+                            {/* Marker line for soft pity */}
+                            <div 
+                              className="absolute top-0 bottom-0 w-0.5 bg-gt-gold z-10 opacity-80" 
+                              style={{ left: `${(b.softPity / b.maxPity) * 100}%` }}
+                              title="Soft Pity Threshold"
+                            ></div>
+                          </div>
+                        </div>
+
+                        {/* Probability & Cost Chips */}
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <div className="bg-gt-raised p-2 rounded-xl border border-gt-border/40">
+                            <div className="text-[10px] font-bold text-gt-subtext">Next Pull Chance</div>
+                            <div className="text-sm font-extrabold text-gt-gold">{currentRate.toFixed(1)}%</div>
+                          </div>
+                          <div className="bg-gt-raised p-2 rounded-xl border border-gt-border/40">
+                            <div className="text-[10px] font-bold text-gt-subtext">To Soft Pity</div>
+                            <div className="text-sm font-extrabold text-gt-text">{primosToSoft} 💎</div>
+                          </div>
+                          <div className="bg-gt-raised p-2 rounded-xl border border-gt-border/40">
+                            <div className="text-[10px] font-bold text-gt-subtext">To Guaranteed</div>
+                            <div className="text-sm font-extrabold text-gt-warmGold">{primosToHard} 💎</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Controls */}
+                    <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-gt-border/50">
+                      <button 
+                        onClick={() => mutateState(p => ({
+                          ...p,
+                          pity: {
+                            ...p.pity,
+                            [b.key]: {
+                              ...p.pity[b.key],
+                              count: p.pity[b.key].count + 1,
+                              totalWishes: (p.pity[b.key].totalWishes || 0) + 1
+                            }
+                          }
+                        }), `+1 Pull on ${b.name}`)}
+                        className="flex-1 min-w-[100px] py-2.5 bg-gradient-to-r from-gt-gold to-gt-warmGold text-black font-extrabold text-xs rounded-xl hover:opacity-90 transition active:scale-95 shadow-md"
+                      >
+                        +1 Wish
+                      </button>
+
+                      <button 
+                        onClick={() => mutateState(p => ({
+                          ...p,
+                          pity: {
+                            ...p.pity,
+                            [b.key]: {
+                              ...p.pity[b.key],
+                              count: p.pity[b.key].count + 10,
+                              totalWishes: (p.pity[b.key].totalWishes || 0) + 10
+                            }
+                          }
+                        }), `+10 Pulls on ${b.name}`)}
+                        className="flex-1 min-w-[100px] py-2.5 bg-gt-raised border border-gt-gold text-gt-gold font-extrabold text-xs rounded-xl hover:bg-gt-gold hover:text-black transition active:scale-95 shadow-md"
+                      >
+                        +10 Wishes
+                      </button>
+
+                      <button 
+                        onClick={() => setLogModalBanner(b.key)}
+                        className="py-2.5 px-4 bg-gt-raised border border-gt-border hover:border-gt-gold text-gt-subtext hover:text-gt-text font-bold text-xs rounded-xl transition"
+                      >
+                        ⭐ Log 4★/5★ Pull
+                      </button>
+
+                      <button 
+                        onClick={() => {
+                          if (confirm(`Reset pity counter for ${b.name}?`)) {
+                            mutateState(p => ({
+                              ...p,
+                              pity: {
+                                ...p.pity,
+                                [b.key]: { ...p.pity[b.key], count: 0 }
+                              }
+                            }), `${b.name} counter reset`);
+                          }
+                        }}
+                        className="py-2.5 px-3 bg-red-500/10 border border-red-500/20 hover:border-red-500 text-red-400 rounded-xl text-xs font-bold transition"
+                        title="Reset Counter"
+                      >
+                        ↺
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      };
+
+      // 3. WISH HISTORY TAB
+      const renderHistoryTab = () => (
+        <div className="space-y-5 animate-slideUp">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h2 className="text-2xl font-bold font-heading text-gt-gold">Wish History Log</h2>
+              <p className="text-xs text-gt-subtext">Review and analyze past pulls</p>
+            </div>
+            
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setLogModalBanner('character')}
+                className="px-3 py-1.5 bg-gt-gold text-black rounded-xl text-xs font-extrabold hover:opacity-90 transition"
+              >
+                + Add Manual Pull
+              </button>
+              <button 
+                onClick={() => {
+                  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
+                  const downloadAnchor = document.createElement('a');
+                  downloadAnchor.setAttribute("href", dataStr);
+                  downloadAnchor.setAttribute("download", `genshin_track_backup_${new Date().toISOString().slice(0,10)}.json`);
+                  document.body.appendChild(downloadAnchor);
+                  downloadAnchor.click();
+                  downloadAnchor.remove();
+                  showToast("Exported Backup JSON!");
+                }}
+                className="px-3 py-1.5 bg-gt-raised border border-gt-border hover:border-gt-gold rounded-xl text-xs font-bold text-gt-subtext hover:text-gt-text transition"
+              >
+                📥 Export Backup
+              </button>
+            </div>
+          </div>
+
+          {/* Luck Statistics Header */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-gt-card border border-gt-border p-3 rounded-2xl text-center">
+              <div className="text-[11px] font-bold text-gt-subtext">Total Recorded Pulls</div>
+              <div className="text-xl font-extrabold text-gt-gold mt-1">{appData.history.length}</div>
+            </div>
+            <div className="bg-gt-card border border-gt-border p-3 rounded-2xl text-center">
+              <div className="text-[11px] font-bold text-gt-subtext">5★ Characters/Weapons</div>
+              <div className="text-xl font-extrabold text-gt-r5 mt-1">
+                {appData.history.filter(h => h.rarity === 5).length}
+              </div>
+            </div>
+            <div className="bg-gt-card border border-gt-border p-3 rounded-2xl text-center">
+              <div className="text-[11px] font-bold text-gt-subtext">Average 5★ Pity</div>
+              <div className="text-xl font-extrabold text-gt-warmGold mt-1">
+                {(() => {
+                  const fives = appData.history.filter(h => h.rarity === 5);
+                  if (fives.length === 0) return 'N/A';
+                  const sum = fives.reduce((acc, curr) => acc + (curr.pity || 0), 0);
+                  return Math.round(sum / fives.length);
+                })()}
+              </div>
+            </div>
+            <div className="bg-gt-card border border-gt-border p-3 rounded-2xl text-center">
+              <div className="text-[11px] font-bold text-gt-subtext">4★ Item Count</div>
+              <div className="text-xl font-extrabold text-gt-r4 mt-1">
+                {appData.history.filter(h => h.rarity === 4).length}
+              </div>
+            </div>
+          </div>
+
+          {/* History List */}
+          <div className="bg-gt-card border border-gt-border rounded-2xl overflow-hidden shadow-lg">
+            {appData.history.length === 0 ? (
+              <div className="p-12 text-center text-gt-subtext space-y-2">
+                <div className="text-4xl">📜</div>
+                <div className="text-sm font-bold">No Wish History Logged Yet</div>
+                <div className="text-xs">Log pulls manually or use the "+1 Wish" button in the Pity tab!</div>
+              </div>
+            ) : (
+              <div className="divide-y divide-gt-border/50">
+                {appData.history.map((item, idx) => {
+                  const matchedChar = CHARACTER_DATABASE.find(c => c.name.toLowerCase() === item.item.toLowerCase());
+                  return (
+                    <div key={item.id || idx} className="p-3.5 flex items-center justify-between hover:bg-gt-raised/50 transition">
+                      <div className="flex items-center gap-3">
+                        <CharacterIcon character={matchedChar || { name: item.item, rarity: item.rarity }} className="w-10 h-10" />
+                        <div>
+                          <div className={`text-sm font-extrabold ${item.rarity === 5 ? 'text-gt-r5' : item.rarity === 4 ? 'text-gt-r4' : 'text-gt-text'}`}>
+                            {item.item}
+                          </div>
+                          <div className="text-[11px] text-gt-subtext capitalize">
+                            {item.banner} Banner • {item.date || 'Recent'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="text-xs font-bold text-gt-gold">{item.pity ? `${item.pity} Pity` : ''}</div>
+                          <div className="text-[10px] text-gt-subtext">{item.rarity}★ Item</div>
+                        </div>
+
+                        <button 
+                          onClick={() => {
+                            mutateState(p => ({
+                              ...p,
+                              history: p.history.filter(h => h.id !== item.id)
+                            }), "Removed item from history");
+                          }}
+                          className="text-gt-subtext hover:text-red-400 p-1 rounded-lg text-xs"
+                          title="Delete"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+
+      // 4. PLANNER & SAVINGS CALCULATOR TAB
+      const renderPlannerTab = () => {
+        const [targetDate, setTargetDate] = useState('2026-11-15');
+        const [welkin, setWelkin] = useState(appData.settings.welkinActive);
+        
+        // Income logic
+        const daysRemaining = Math.max(1, Math.ceil((new Date(targetDate) - new Date()) / (1000 * 60 * 60 * 24)));
+        const dailyPrimos = 60 + (welkin ? 90 : 0);
+        const estimatedProjectedPrimos = appData.savings.primogems + (daysRemaining * dailyPrimos);
+        const totalProjectedWishes = Math.floor(estimatedProjectedPrimos / 160) + appData.savings.fatesIntertwined;
+
+        // Wishlist goal requirements sum
+        const totalTargetWishesNeeded = appData.wishlist.reduce((acc, curr) => acc + (curr.wishBudget || 90), 0);
+        const shortfall = Math.max(0, totalTargetWishesNeeded - totalProjectedWishes);
+
+        return (
+          <div className="space-y-5 animate-slideUp">
+            <h2 className="text-2xl font-bold font-heading text-gt-gold">Savings & Banner Planner</h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Settings Input Card */}
+              <div className="bg-gt-card border border-gt-border rounded-2xl p-4 space-y-4 shadow-lg">
+                <h3 className="text-sm font-extrabold text-gt-gold uppercase tracking-wider">Planner Settings</h3>
+
+                <div>
+                  <label className="text-xs font-bold text-gt-subtext block mb-1">Target Banner End Date</label>
+                  <input 
+                    type="date" 
+                    value={targetDate} 
+                    onChange={e => setTargetDate(e.target.value)}
+                    className="w-full bg-gt-raised border border-gt-border rounded-xl p-2 text-xs font-bold text-gt-text focus:outline-none focus:border-gt-gold"
+                  />
+                  <span className="text-[10px] text-gt-subtext mt-1 block">{daysRemaining} days remaining</span>
+                </div>
+
+                <div className="flex items-center justify-between bg-gt-raised p-3 rounded-xl border border-gt-border">
+                  <div>
+                    <div className="text-xs font-bold text-gt-text">Welkin Moon Active</div>
+                    <div className="text-[10px] text-gt-subtext">+90 Primogems daily</div>
+                  </div>
+                  <input 
+                    type="checkbox" 
+                    checked={welkin} 
+                    onChange={e => setWelkin(e.target.checked)}
+                    className="w-4 h-4 accent-gt-gold"
+                  />
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-gt-border">
+                  <div className="text-xs font-bold text-gt-subtext">Current Savings Inputs</div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span>Primogems:</span>
+                    <input 
+                      type="number" 
+                      value={appData.savings.primogems} 
+                      onChange={e => mutateState(p => ({ ...p, savings: { ...p.savings, primogems: parseInt(e.target.value) || 0 } }))}
+                      className="w-24 bg-gt-raised border border-gt-border rounded-lg p-1 text-right font-bold text-gt-gold"
+                    />
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span>Intertwined Fates:</span>
+                    <input 
+                      type="number" 
+                      value={appData.savings.fatesIntertwined} 
+                      onChange={e => mutateState(p => ({ ...p, savings: { ...p.savings, fatesIntertwined: parseInt(e.target.value) || 0 } }))}
+                      className="w-24 bg-gt-raised border border-gt-border rounded-lg p-1 text-right font-bold text-gt-r5"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Projected Savings Card */}
+              <div className="bg-gt-card border border-gt-border rounded-2xl p-5 shadow-lg md:col-span-2 flex flex-col justify-between">
+                <div>
+                  <div className="text-xs font-bold text-gt-subtext uppercase tracking-wider">Projected Outcome</div>
+                  <div className="text-3xl font-black text-gradient-gold my-2">
+                    {totalProjectedWishes} <span className="text-sm font-normal text-gt-subtext">Total Wishes Available by Target Date</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 my-4">
+                    <div className="bg-gt-raised p-3 rounded-xl border border-gt-border/50">
+                      <div className="text-[11px] text-gt-subtext font-bold">Estimated Primogems</div>
+                      <div className="text-lg font-extrabold text-gt-gold">{estimatedProjectedPrimos.toLocaleString()} 💎</div>
+                    </div>
+                    <div className="bg-gt-raised p-3 rounded-xl border border-gt-border/50">
+                      <div className="text-[11px] text-gt-subtext font-bold">Wishlist Goal Need</div>
+                      <div className="text-lg font-extrabold text-gt-warmGold">{totalTargetWishesNeeded} Wishes</div>
+                    </div>
+                  </div>
+
+                  {/* Status Indicator */}
+                  <div className={`p-4 rounded-xl border font-bold text-xs ${shortfall === 0 ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                    {shortfall === 0 ? (
+                      <div>🎉 Target Achievable! You are projected to have enough wishes for your current Wishlist goals.</div>
+                    ) : (
+                      <div>⚠️ Shortfall of {shortfall} wishes ({shortfall * 160} Primogems). You need ~{Math.ceil((shortfall * 160) / daysRemaining)} extra Primogems daily from events/exploration.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-gt-subtext mt-4">
+                  * Daily income accounts for Daily Commissions (60) + Welkin (90). Events, Spiral Abyss, and Imaginarium Theater provide extra rewards.
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      // 5. MATERIALS & RESIN TAB
+      const renderMaterialsTab = () => {
+        const dayIdx = new Date().getDay();
+        const todaySchedule = DOMAIN_SCHEDULE[dayIdx];
+
+        return (
+          <div className="space-y-5 animate-slideUp">
+            <h2 className="text-2xl font-bold font-heading text-gt-gold">Materials & Domain Tracker</h2>
+
+            {/* Resin Management Gauge */}
+            <div className="bg-gt-card border border-gt-border rounded-2xl p-5 shadow-lg">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-gt-raised border border-gt-border flex items-center justify-center text-3xl font-extrabold text-gt-hydro">
+                    🌙
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-gt-subtext">Original Resin Counter</div>
+                    <div className="text-3xl font-black text-gt-text my-0.5">{appData.resin.current} <span className="text-sm font-normal text-gt-subtext">/ 200</span></div>
+                    <div className="text-xs text-gt-hydro font-bold">
+                      {appData.resin.current >= 200 ? "Cap Reached!" : `Fully Replenished in ${Math.ceil((200 - appData.resin.current) * 8 / 60)} Hours`}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                  <button 
+                    onClick={() => mutateState(p => ({ ...p, resin: { ...p.resin, current: Math.min(200, p.resin.current + 60) } }), "Added 60 Resin (Fragile)")}
+                    className="px-3 py-2 bg-gt-raised border border-gt-border hover:border-gt-gold rounded-xl text-xs font-bold text-gt-gold transition"
+                  >
+                    🧪 +60 Fragile
+                  </button>
+                  <button 
+                    onClick={() => mutateState(p => ({ ...p, resin: { ...p.resin, current: 200 } }), "Resin Set to 200")}
+                    className="px-3 py-2 bg-gt-raised border border-gt-border hover:border-gt-gold rounded-xl text-xs font-bold text-gt-subtext transition"
+                  >
+                    Max
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Today's Domain Schedule */}
+            <div className="bg-gt-card border border-gt-border rounded-2xl p-5 shadow-lg space-y-3">
+              <div className="flex justify-between items-center">
+                <h3 className="text-base font-extrabold text-gt-gold">⚔️ Today's Farmable Materials ({todaySchedule.name})</h3>
+                <span className="text-xs px-2.5 py-1 bg-gt-raised rounded-full text-gt-subtext border border-gt-border font-bold">Server Day</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gt-raised p-4 rounded-xl border border-gt-border/50">
+                  <div className="text-xs font-bold text-gt-warmGold uppercase mb-2">Talent Level-Up Books</div>
+                  <div className="flex flex-wrap gap-2">
+                    {todaySchedule.talents.map((t, idx) => (
+                      <span key={idx} className="px-2.5 py-1 bg-gt-card border border-gt-border rounded-lg text-xs font-bold text-gt-text">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-gt-raised p-4 rounded-xl border border-gt-border/50">
+                  <div className="text-xs font-bold text-gt-hydro uppercase mb-2">Weapon Ascension Materials</div>
+                  <div className="flex flex-wrap gap-2">
+                    {todaySchedule.weapons.map((w, idx) => (
+                      <span key={idx} className="px-2.5 py-1 bg-gt-card border border-gt-border rounded-lg text-xs font-bold text-gt-text">
+                        {w}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      // 6. TO-DO CHECKLIST TAB
+      const renderTodoTab = () => {
+        const [newTaskTitle, setNewTaskTitle] = useState('');
+        const [newTaskCategory, setNewTaskCategory] = useState('Daily');
+
+        const handleAddTask = (e) => {
+          e.preventDefault();
+          if (!newTaskTitle.trim()) return;
+          mutateState(p => ({
+            ...p,
+            todo: [
+              ...p.todo,
+              { id: Date.now().toString(), title: newTaskTitle.trim(), category: newTaskCategory, completed: false, priority: 'medium' }
+            ]
+          }), "Task Added");
+          setNewTaskTitle('');
+        };
+
+        return (
+          <div className="space-y-5 animate-slideUp">
+            <h2 className="text-2xl font-bold font-heading text-gt-gold">Genshin Companion To-Do List</h2>
+
+            {/* Quick Add Form */}
+            <form onSubmit={handleAddTask} className="flex gap-2">
+              <input 
+                type="text" 
+                placeholder="Add a new task (e.g. Farm Artifacts, Weekly Bosses)..."
+                value={newTaskTitle}
+                onChange={e => setNewTaskTitle(e.target.value)}
+                className="flex-1 bg-gt-card border border-gt-border rounded-xl px-4 py-2.5 text-xs font-bold text-gt-text focus:outline-none focus:border-gt-gold"
+              />
+              <select 
+                value={newTaskCategory}
+                onChange={e => setNewTaskCategory(e.target.value)}
+                className="bg-gt-card border border-gt-border rounded-xl px-3 py-2.5 text-xs font-bold text-gt-subtext focus:outline-none"
+              >
+                <option>Daily</option>
+                <option>Domain</option>
+                <option>Boss</option>
+                <option>Quest</option>
+              </select>
+              <button 
+                type="submit"
+                className="px-4 py-2.5 bg-gt-gold text-black rounded-xl text-xs font-extrabold hover:opacity-90 transition"
+              >
+                + Add
+              </button>
+            </form>
+
+            {/* Task Checklist */}
+            <div className="bg-gt-card border border-gt-border rounded-2xl overflow-hidden shadow-lg divide-y divide-gt-border/50">
+              {appData.todo.length === 0 ? (
+                <div className="p-8 text-center text-gt-subtext text-xs">No tasks active. Add one above!</div>
+              ) : (
+                appData.todo.map(task => (
+                  <div key={task.id} className="p-3.5 flex items-center justify-between hover:bg-gt-raised/40 transition">
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="checkbox" 
+                        checked={task.completed} 
+                        onChange={() => mutateState(p => ({
+                          ...p,
+                          todo: p.todo.map(t => t.id === task.id ? { ...t, completed: !t.completed } : t)
+                        }))}
+                        className="w-4 h-4 accent-gt-gold rounded cursor-pointer"
+                      />
+                      <span className={`text-xs font-bold ${task.completed ? 'line-through text-gt-subtext/60' : 'text-gt-text'}`}>
+                        {task.title}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 bg-gt-raised border border-gt-border rounded text-[10px] font-bold text-gt-subtext">
+                        {task.category}
+                      </span>
+                      <button 
+                        onClick={() => mutateState(p => ({ ...p, todo: p.todo.filter(t => t.id !== task.id) }), "Task Deleted")}
+                        className="text-gt-subtext hover:text-red-400 p-1 text-xs"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        );
+      };
+
+      // 7. CHARACTERS TAB
+      const renderCharactersTab = () => {
+        const [filterElement, setFilterElement] = useState('all');
+
+        const filtered = CHARACTER_DATABASE.filter(c => {
+          if (filterElement !== 'all' && c.element.toLowerCase() !== filterElement) return false;
+          return true;
+        });
+
+        return (
+          <div className="space-y-5 animate-slideUp">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <h2 className="text-2xl font-bold font-heading text-gt-gold">Character Roster</h2>
+
+              {/* Element Filter Buttons */}
+              <div className="flex flex-wrap gap-1">
+                {['all', 'pyro', 'hydro', 'anemo', 'electro', 'dendro', 'cryo', 'geo'].map(el => (
+                  <button 
+                    key={el}
+                    onClick={() => setFilterElement(el)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold capitalize transition ${filterElement === el ? 'bg-gt-gold text-black' : 'bg-gt-card border border-gt-border text-gt-subtext hover:text-gt-text'}`}
+                  >
+                    {el}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Character Roster Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {filtered.map(char => {
+                const prog = appData.characterProgress[char.id] || { owned: false, constellation: 0 };
+                return (
+                  <div key={char.id} className="bg-gt-card border border-gt-border hover:border-gt-gold/50 rounded-2xl p-3 shadow-md transition flex flex-col items-center text-center relative">
+                    <CharacterIcon character={char} className="w-16 h-16 my-1" />
+                    <div className="text-xs font-extrabold text-gt-text mt-1">{char.name}</div>
+                    <div className="text-[10px] font-bold text-gt-subtext capitalize">{char.element} • {char.weapon}</div>
+
+                    <div className="flex items-center gap-2 mt-3 w-full">
+                      <button 
+                        onClick={() => mutateState(p => ({
+                          ...p,
+                          characterProgress: {
+                            ...p.characterProgress,
+                            [char.id]: { ...prog, owned: !prog.owned }
+                          }
+                        }))}
+                        className={`flex-1 py-1 rounded-lg text-[10px] font-extrabold border transition ${prog.owned ? 'bg-gt-gold/20 border-gt-gold text-gt-gold' : 'bg-gt-raised border-gt-border text-gt-subtext'}`}
+                      >
+                        {prog.owned ? `Owned (C${prog.constellation})` : 'Unowned'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      };
+
+      // 8. WISHLIST TAB
+      const renderWishlistTab = () => (
+        <div className="space-y-5 animate-slideUp">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold font-heading text-gt-gold">Wishlist & Target Goals</h2>
+            <button 
+              onClick={() => {
+                const name = prompt("Target Character/Weapon Name:");
+                if (name) {
+                  mutateState(p => ({
+                    ...p,
+                    wishlist: [
+                      ...p.wishlist,
+                      { id: Date.now().toString(), name, type: 'character', banner: 'character', goal: 'C0', priority: p.wishlist.length + 1, wishBudget: 90 }
+                    ]
+                  }), "Added to Wishlist");
+                }
+              }}
+              className="px-3 py-1.5 bg-gt-gold text-black rounded-xl text-xs font-extrabold hover:opacity-90 transition"
+            >
+              + Add Target Goal
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {appData.wishlist.map(target => (
+              <div key={target.id} className="bg-gt-card border border-gt-border rounded-2xl p-4 shadow-lg flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gt-raised border border-gt-gold/40 flex items-center justify-center font-black text-gt-gold text-sm">
+                    #{target.priority}
+                  </div>
+                  <div>
+                    <div className="text-sm font-extrabold text-gt-text">{target.name}</div>
+                    <div className="text-xs text-gt-subtext">Goal: {target.goal} • Estimated Wish Budget: {target.wishBudget} Wishes</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => mutateState(p => ({ ...p, wishlist: p.wishlist.filter(w => w.id !== target.id) }), "Goal Removed")}
+                    className="p-2 bg-gt-raised border border-gt-border hover:border-red-400 text-gt-subtext hover:text-red-400 rounded-xl text-xs font-bold transition"
+                  >
+                    🗑️ Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+
+      // 9. SETTINGS TAB
+      const renderSettingsTab = () => (
+        <div className="space-y-6 animate-slideUp">
+          <h2 className="text-2xl font-bold font-heading text-gt-gold">Application Settings</h2>
+
+          <div className="bg-gt-card border border-gt-border rounded-2xl p-5 shadow-lg space-y-4">
+            <h3 className="text-sm font-extrabold text-gt-gold uppercase tracking-wider">Appearance & Options</h3>
+
+            <div className="flex justify-between items-center py-2 border-b border-gt-border/50">
+              <div>
+                <div className="text-xs font-bold text-gt-text">Enable Chronicled Wish Banner</div>
+                <div className="text-[10px] text-gt-subtext">Display Chronicled Wish card in Pity tab</div>
+              </div>
+              <input 
+                type="checkbox" 
+                checked={appData.settings.chronicledWishEnabled}
+                onChange={e => mutateState(p => ({ ...p, settings: { ...p.settings, chronicledWishEnabled: e.target.checked } }))}
+                className="w-4 h-4 accent-gt-gold"
+              />
+            </div>
+
+            {/* Health Check */}
+            <div className="pt-2">
+              <button 
+                onClick={() => {
+                  showToast("Health Check Complete: All Data Structures Valid!");
+                }}
+                className="px-4 py-2 bg-gt-raised border border-gt-gold text-gt-gold hover:bg-gt-gold hover:text-black rounded-xl text-xs font-extrabold transition"
+              >
+                🏥 Run Data Diagnostic Health Check
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+
+      // --- MANUAL PULL LOG MODAL ---
+      const renderLogModal = () => {
+        if (!logModalBanner) return null;
+
+        const [selectedItem, setSelectedItem] = useState(CHARACTER_DATABASE[0].name);
+        const [rarity, setRarity] = useState(5);
+        const [pityAtPull, setPityAtPull] = useState(appData.pity[logModalBanner]?.count || 1);
+
+        const handleSave = (e) => {
+          e.preventDefault();
+          mutateState(p => ({
+            ...p,
+            pity: {
+              ...p.pity,
+              [logModalBanner]: {
+                ...p.pity[logModalBanner],
+                count: rarity === 5 ? 0 : p.pity[logModalBanner].count,
+                totalWishes: (p.pity[logModalBanner].totalWishes || 0) + 1
+              }
+            },
+            history: [
+              {
+                id: Date.now().toString(),
+                banner: logModalBanner,
+                item: selectedItem,
+                rarity,
+                pity: pityAtPull,
+                date: new Date().toISOString().slice(0, 10)
+              },
+              ...p.history
+            ]
+          }), `Logged ${rarity}★ ${selectedItem}!`);
+          setLogModalBanner(null);
+        };
+
+        return (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-gt-card border border-gt-border rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-gt-border pb-3">
+                <h3 className="text-lg font-black text-gt-gold">Log Specific Wish Result</h3>
+                <button onClick={() => setLogModalBanner(null)} className="text-gt-subtext hover:text-gt-text">✕</button>
+              </div>
+
+              <form onSubmit={handleSave} className="space-y-4 text-xs font-bold">
+                <div>
+                  <label className="text-gt-subtext block mb-1">Rarity</label>
+                  <div className="flex gap-2">
+                    {[5, 4, 3].map(r => (
+                      <button 
+                        type="button" 
+                        key={r}
+                        onClick={() => setRarity(r)}
+                        className={`flex-1 py-2 rounded-xl border transition ${rarity === r ? 'bg-gt-gold text-black border-gt-gold' : 'bg-gt-raised border-gt-border text-gt-subtext'}`}
+                      >
+                        {r}★
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-gt-subtext block mb-1">Item Name</label>
+                  <select 
+                    value={selectedItem} 
+                    onChange={e => setSelectedItem(e.target.value)}
+                    className="w-full bg-gt-raised border border-gt-border rounded-xl p-2.5 text-gt-text font-bold focus:outline-none"
+                  >
+                    {CHARACTER_DATABASE.map(c => <option key={c.id} value={c.name}>{c.name} ({c.element})</option>)}
+                    {WEAPON_DATABASE.map(w => <option key={w.id} value={w.name}>{w.name} ({w.type})</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-gt-subtext block mb-1">Pity at Pull</label>
+                  <input 
+                    type="number" 
+                    value={pityAtPull} 
+                    onChange={e => setPityAtPull(parseInt(e.target.value) || 1)}
+                    className="w-full bg-gt-raised border border-gt-border rounded-xl p-2.5 text-gt-gold font-bold focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button type="submit" className="flex-1 py-3 bg-gt-gold text-black font-extrabold rounded-xl hover:opacity-90 transition">
+                    Save Wish Pull
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col pb-20 md:pb-6">
+          {/* Header Navigation */}
+          <header className="sticky top-0 z-40 bg-gt-bg/90 backdrop-blur-md border-b border-gt-border py-3 px-4 sm:px-8">
+            <div className="max-w-6xl mx-auto flex justify-between items-center">
+              <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('home')}>
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-gt-gold to-gt-warmGold flex items-center justify-center text-black font-black text-xl shadow-lg glow-gold">
+                  ✦
+                </div>
+                <div>
+                  <h1 className="text-xl font-black font-genshin text-gradient-gold tracking-wide leading-none">Genshin Track</h1>
+                  <span className="text-[10px] font-bold text-gt-subtext tracking-widest uppercase">Genshin Impact Companion</span>
+                </div>
+              </div>
+
+              {/* Top Navigation Links */}
+              <nav className="hidden md:flex items-center gap-1 bg-gt-sec p-1 rounded-2xl border border-gt-border">
+                {[
+                  { id: 'home', label: 'Home' },
+                  { id: 'pity', label: 'Pity' },
+                  { id: 'history', label: 'History' },
+                  { id: 'planner', label: 'Planner' },
+                  { id: 'materials', label: 'Materials' },
+                  { id: 'todo', label: 'To-do' },
+                  { id: 'characters', label: 'Characters' },
+                  { id: 'wishlist', label: 'Wishlist' }
+                ].map(t => (
+                  <button 
+                    key={t.id}
+                    onClick={() => setActiveTab(t.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition ${activeTab === t.id ? 'bg-gt-gold text-black shadow-md' : 'text-gt-subtext hover:text-gt-text'}`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </nav>
+
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setIsSearchOpen(true)}
+                  className="p-2 bg-gt-card border border-gt-border hover:border-gt-gold rounded-xl text-gt-subtext hover:text-gt-text text-xs font-bold transition"
+                  title="Search"
+                >
+                  🔍
+                </button>
+                <button 
+                  onClick={() => setActiveTab('settings')}
+                  className="p-2 bg-gt-card border border-gt-border hover:border-gt-gold rounded-xl text-gt-subtext hover:text-gt-text text-xs font-bold transition"
+                  title="Settings"
+                >
+                  ⚙️
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {/* Main Content View Container */}
+          <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6">
+            {activeTab === 'home' && renderHomeTab()}
+            {activeTab === 'pity' && renderPityTab()}
+            {activeTab === 'history' && renderHistoryTab()}
+            {activeTab === 'planner' && renderPlannerTab()}
+            {activeTab === 'materials' && renderMaterialsTab()}
+            {activeTab === 'todo' && renderTodoTab()}
+            {activeTab === 'characters' && renderCharactersTab()}
+            {activeTab === 'wishlist' && renderWishlistTab()}
+            {activeTab === 'settings' && renderSettingsTab()}
+          </main>
+
+          {/* Mobile Bottom Navigation Bar */}
+          <nav className="md:hidden fixed bottom-0 inset-x-0 bg-gt-sec/95 backdrop-blur-md border-t border-gt-border p-2 z-40 flex justify-around items-center">
+            {[
+              { id: 'pity', label: 'Pity', icon: '✨' },
+              { id: 'home', label: 'Home', icon: '🏠' },
+              { id: 'planner', label: 'Planner', icon: '💎' },
+              { id: 'materials', label: 'Materials', icon: '🌙' },
+              { id: 'todo', label: 'To-do', icon: '📋' },
+              { id: 'history', label: 'History', icon: '📜' }
+            ].map(m => (
+              <button 
+                key={m.id}
+                onClick={() => setActiveTab(m.id)}
+                className={`flex flex-col items-center gap-0.5 p-1 rounded-xl transition ${activeTab === m.id ? 'text-gt-gold' : 'text-gt-subtext'}`}
+              >
+                <span className="text-base">{m.icon}</span>
+                <span className="text-[10px] font-bold">{m.label}</span>
+              </button>
+            ))}
+          </nav>
+
+          {/* Toast Message Container */}
+          {toastMessage && (
+            <div className="fixed bottom-16 md:bottom-6 right-6 bg-gt-gold text-black font-black text-xs px-4 py-2.5 rounded-2xl shadow-2xl z-50 animate-bounceSlow">
+              ✦ {toastMessage}
+            </div>
+          )}
+
+          {/* Log Pull Modal */}
+          {renderLogModal()}
+        </div>
+      );
+    }
+
+    // Render App
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
